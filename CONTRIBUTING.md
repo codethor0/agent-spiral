@@ -31,7 +31,7 @@ python3 the_spiral.py --fast --live 1 --from L15 --seconds 1
 python3 - <<'EOF'
 import json
 s = open('the_spiral_trace.log').read()
-json.loads(s.split('SUMMARY (JSON)')[1])
+json.loads(s.rsplit('SUMMARY (JSON)\n', 1)[1])
 print('trace JSON ok')
 EOF
 ```

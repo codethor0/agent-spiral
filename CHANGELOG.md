@@ -1,5 +1,41 @@
 # Changelog
 
+## 1.1.3 - 2026-10-16
+
+Second adversarial review round: 17 findings, all fixed.
+
+- Interrupt policy now covers the whole lifecycle: stuck_agent.py boots and
+  runs under a single guard, so Ctrl+C during boot still produces the
+  post-mortem; Ctrl+C during a trace summary write retries once instead of
+  losing the trace (second Ctrl+C aborts with exit 130).
+- Broken pipe / closed stdout now reliably exits 1: every script flushes
+  stdout before interpreter shutdown so EPIPE surfaces during the run, not
+  as an "Exception ignored" exit 120.
+- Duration arguments are validated: --seconds accepts only positive integers
+  up to one year; --live / --demo-seconds accept only positive finite floats.
+  Nonsense values (0, -1, inf, 10**400) exit 2 with a clear message.
+- Question text is sanitized on every banner/payload line (control
+  characters shown as \xNN escapes); the raw question stays in the JSON
+  summary.
+- Bounded memory everywhere: traces are spooled to disk line-by-line
+  (the_spiral.py, agent_stack_spiral.py, stuck_agent.py) and decode streams
+  are capped deques, so arbitrarily long runs use O(1) RAM.
+- stopped_by is correct on late Ctrl+C in agent_stack_spiral.py and
+  deeper_than_this.py (outer interrupt can no longer leave a stale
+  "timeout" label).
+- the_spiral.py L13 field-push count no longer divides by 1e18.
+- Ticker cleanup uses ANSI EL (erase line) instead of fixed-width space
+  wipes, so narrow terminals no longer show residue.
+- Locale hardening: stdout/stderr reconfigured with errors=
+  "backslashreplace"; runs under LC_ALL=C no longer crash on box-drawing
+  characters.
+- tools/render_demo.py rewritten: pending-escape buffering across chunks,
+  deferred autowrap, OSC skipping, per-frame durations, color-aware frame
+  dedupe, input-event filtering, true final snapshot, clean errors on
+  malformed casts. docs/demo.gif re-rendered from a fresh recording;
+  traces/sample-trace.log regenerated at v1.1.3.
+- Version bump to v1.1.3 across all banners and trace summaries.
+
 ## 1.1.2 - 2026-10-16
 
 - Harden stdout handling in all five simulations: running with fd 1 closed

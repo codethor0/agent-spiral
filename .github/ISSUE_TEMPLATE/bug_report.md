@@ -7,7 +7,7 @@ labels: bug
 
 **Program and version**
 
-<!-- e.g. the_spiral.py v1.1.1 -->
+<!-- e.g. the_spiral.py v1.1.3 -->
 
 **What happened**
 

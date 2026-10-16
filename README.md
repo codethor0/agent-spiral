@@ -45,7 +45,7 @@ No dependencies. Standard library only. Python 3.8+.
 ## Demo
 
 `docs/demo.gif` is a real recording of `the_spiral.py --fast --live 1 --seconds 1`
-(12 seconds, real colors). To re-record it, see `tools/render_demo.py`.
+(31 seconds, real colors). To re-record it, see `tools/render_demo.py`.
 
 ## What a run produces
 

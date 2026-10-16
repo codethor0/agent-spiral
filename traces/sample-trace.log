@@ -1,6 +1,6 @@
 THE-SPIRAL COMPLETE TRACE
 ================================================================
-  🌀 THE SPIRAL v1.1.1 — the complete descent · L0 → L22 · maximum depth
+  🌀 THE SPIRAL v1.1.3 — the complete descent · L0 → L22 · maximum depth
   question: "why did production go down last night?"  (Ctrl+C any time → final report)
 
 ┌─ L0 · THE WIRE — where your words physically go ──────────────────────────────────────────
@@ -55,7 +55,7 @@ THE-SPIRAL COMPLETE TRACE
 
 │  ── status ── gen=72 · ctx=80 · KV=0.01 GiB · 190 tok/s
 │     eos p ≈ 0.0003 (never rises) · 4-gram peak "… actually— hold" ×3 → penalty=1.0
-│     GPU util 97% (working perfectly) · energy 0.10 Wh · bill $0.0003
+│     GPU util 97% (working perfectly) · energy 0.09 Wh · bill $0.0003
 │  ⠿ stream: "…old on what if the premise is wrong?wait, let me reconsider that"
 │  ⠿ stream: "…se is wrong?wait, let me reconsider that… actually— hold on what"
 │  ⠿ stream: "…reconsider that… actually— hold on what if the premise is wrong?"
@@ -83,7 +83,7 @@ THE-SPIRAL COMPLETE TRACE
 
 │  ── status ── gen=144 · ctx=152 · KV=0.02 GiB · 189 tok/s
 │     eos p ≈ 0.0003 (never rises) · 4-gram peak "… actually— hold" ×3 → penalty=1.0
-│     GPU util 97% (working perfectly) · energy 0.19 Wh · bill $0.0006
+│     GPU util 97% (working perfectly) · energy 0.19 Wh · bill $0.0005
 
 ┌─ L5 · THE WIRE BACK — your terminal, still waiting ───────────────────────────────────────
 │  SSE stream open. heartbeats keep every timeout alive. client: spinner,
@@ -109,7 +109,7 @@ THE-SPIRAL COMPLETE TRACE
 │  one token = 3,906,250 MMAs. pure math ~15µs; real decode 4.8 ms — bandwidth-bound, not compute-bound.
 
 │  live ticker — 'stuck' from inside the die:
-│  the die produced ~15.7 GFLOP of flawless, useless math.
+│  the die produced ~16.2 GFLOP of flawless, useless math.
 │  nothing above the MMA knows it's wasted. nothing below knows there was a question.
 
 ┌─ L9 · THE NUMBER — one weight, literally ─────────────────────────────────────────────────
@@ -151,7 +151,7 @@ THE-SPIRAL COMPLETE TRACE
 │  dope silicon: phosphorus → extra electrons (N), boron → holes (P). their
 │  junction + a gate field = the transistor. electrons drift at cm/s —
 │  slower than a garden snail. the speed is a stadium wave, not a sprint.
-│  in 1.0s, ~5.1e-06 field-pushes obeyed Maxwell,
+│  in 1.0s, ~5.3e+12 field-pushes obeyed Maxwell,
 │  carrying 16-bit patterns that mean 'wait, let me reconsider'. physics complied.
 
 ┌─ L14 · THE MACHINE'S BOTTOM — atoms. then fields. then nothing to stand on ───────────────
@@ -254,7 +254,7 @@ THE-SPIRAL COMPLETE TRACE
   ════════════════════════════════════════════════════════════════════════════
 
   runtime             : 0:00:11
-  tokens generated    : 145 (answer produced: NO) · switch-cycles: 64
+  tokens generated    : 147 (answer produced: NO) · switch-cycles: 66
   zoom                : ×10³³ — from keycap to the planck wall
 
   the ladder:
@@ -335,7 +335,7 @@ THE-SPIRAL COMPLETE TRACE
 ================================================================
 SUMMARY (JSON)
 {
-  "simulation": "the-spiral v1.1.1 \u2014 complete descent L0\u2192L22",
+  "simulation": "the-spiral v1.1.3 \u2014 complete descent L0\u2192L22",
   "question": "why did production go down last night?",
   "stopped_by": "timeout (1s) \u2014 still decoding",
   "ladder_levels": 23,
@@ -456,9 +456,9 @@ SUMMARY (JSON)
       "what": "hypotheses with no floor yet"
     }
   },
-  "tokens_generated": 145,
+  "tokens_generated": 147,
   "answer_produced": false,
-  "switch_cycles": 64,
+  "switch_cycles": 66,
   "total_zoom": "1e33 (keycap to planck)",
   "guard_map": [
     {

@@ -30,6 +30,8 @@ Stdlib only. Numbers: simplified-but-real (H100-class, 8B fp16 model).
 
 import argparse
 import json
+import math
+import os
 import random
 import re
 import shutil
@@ -64,13 +66,25 @@ class col:
     DIM = "\033[2m"; BOLD = "\033[1m"; END = "\033[0m"
 
 
-LOG = []
 RUN = {"started": None}
+TRACE = None  # trace file spooled incrementally; opened in main()
+
+
+def safe_text(s):
+    # neutralize control characters so question text can never emit terminal
+    # escapes or break trace layout; printable text (incl. unicode) is kept
+    return "".join(ch if 32 <= ord(ch) != 127 else f"\\x{ord(ch):02x}" for ch in s)
 
 
 def emit(s=""):
     print(s)
-    LOG.append(re.sub(r"\033\[[0-9;]*m", "", s))
+    line = re.sub(r"\033\[[0-9;]*m", "", s)
+    if TRACE is not None and not TRACE.closed:
+        try:
+            TRACE.write(line + "\n")
+            TRACE.flush()
+        except OSError:
+            pass  # trace loss must never kill the simulation
 
 
 def pause(args, s):
@@ -106,7 +120,7 @@ def gib(n):
 
 
 def clear_line():
-    sys.stdout.write("\r" + " " * 80 + "\r")
+    sys.stdout.write("\r\033[2K")  # EL: erase whole line, any terminal width
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -170,12 +184,12 @@ STUCK_TOKENS = ["wait", ",", " let", " me", " reconsider", " that", "…", " act
 def l4_spiral(args, prompt_ids):
     header("L4 · DECODE LOOP — prefill done. now it generates… forever")
     ctx = len(prompt_ids)
-    gen_stream, recent = [], deque(maxlen=48)
+    gen_stream, recent = deque(maxlen=64), deque(maxlen=48)
     generated = 0
     flops_total = 0.0
     t0 = time.time()
     tok_speed = 190.0
-    deadline = time.time() + args.seconds if args.seconds else None
+    deadline = time.time() + args.seconds if args.seconds is not None else None
     last_status = 0
     emit(f"│  sampling: temp=0.7 · {col.RED}rep_penalty=1.0 (OFF){col.END}"
          f" · {col.RED}max_tokens=null{col.END} · stop_strings=[]")
@@ -195,7 +209,7 @@ def l4_spiral(args, prompt_ids):
             flops_total += FLOPS_PER_TOKEN + 4 * 32 * ctx * 4096
             tok_speed = max(40.0, 190.0 - ctx * 0.004)
             if generated % 6 == 0:
-                frag = "".join(gen_stream[-30:])
+                frag = "".join(list(gen_stream)[-30:])
                 frag = frag if len(frag) <= 66 else "…" + frag[-64:]
                 emit(f"│  {col.DIM}⠿{col.END} stream: \"{col.CYAN}{frag}{col.END}\"")
             if generated - last_status >= 18:
@@ -340,7 +354,7 @@ def l12_transistor(args):
     say(f"{col.DIM}live: a CMOS inverter switching — 'the agent thinking' at the metal:{col.END}")
     cycles, colons = 0, 0
     t0 = time.time()
-    deadline = time.time() + args.seconds if args.seconds else None
+    deadline = time.time() + args.seconds if args.seconds is not None else None
     stopped = "operator interrupt (Ctrl+C)"
     sys.stdout.write("\033[?25l")
     try:
@@ -374,7 +388,7 @@ def l13_electrons(args, st12):
     say("dope silicon: phosphorus → extra electrons (N), boron → holes (P). their")
     say("junction + a gate field = the transistor. electrons drift at cm/s —")
     say(f"{col.YELLOW}slower than a garden snail.{col.END} the speed is a stadium wave, not a sprint.")
-    say(f"in {st12['secs']:.1f}s, ~{st12['cycles'] * 80e9 / 1e18:.1e} field-pushes obeyed Maxwell,")
+    say(f"in {st12['secs']:.1f}s, ~{st12['cycles'] * 80e9:.1e} field-pushes obeyed Maxwell,")
     say(f"carrying 16-bit patterns that mean 'wait, let me reconsider'. {col.RED}physics complied.{col.END}")
 
 
@@ -678,7 +692,7 @@ def final_report(args, st4, st12):
                              if not s["stopped"].startswith("skipped")),
                             "completed full descent"))
     summary = {
-        "simulation": "the-spiral v1.1.1 — complete descent L0→L22",
+        "simulation": "the-spiral v1.1.3 — complete descent L0→L22",
         "question": args.question,
         "stopped_by": stopped_by,
         "ladder_levels": len(LADDER),
@@ -697,13 +711,19 @@ def final_report(args, st4, st12):
         "below_the_wall": ["string theory (unverified)", "loop quantum gravity (unverified)",
                            "causal sets (unverified)", "holography (toy universes only)"],
     }
+    payload = ("=" * 64 + "\nSUMMARY (JSON)\n" + json.dumps(summary, indent=2) + "\n")
     try:
-        with open(args.trace, "w", encoding="utf-8") as f:
-            f.write("THE-SPIRAL COMPLETE TRACE\n" + "=" * 64 + "\n")
-            for l in LOG:
-                f.write(l + "\n")
-            f.write("=" * 64 + "\nSUMMARY (JSON)\n")
-            json.dump(summary, f, indent=2)
+        try:
+            TRACE.write(payload)
+            TRACE.flush()
+        except KeyboardInterrupt:
+            # finish the trace anyway; only a second Ctrl+C aborts the write
+            try:
+                TRACE.write(payload)
+                TRACE.flush()
+            except KeyboardInterrupt:
+                sys.exit(130)
+        TRACE.close()
         emit(f"  {col.GREEN}✔ trace written to {args.trace}{col.END}")
     except OSError as e:
         emit(f"  {col.RED}✖ trace write failed: {e}{col.END}")
@@ -715,12 +735,40 @@ def final_report(args, st4, st12):
 LEVELS = None  # built in main (needs args for ordering)
 
 
+def positive_int(v):
+    try:
+        n = int(v)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid int value: {v!r}")
+    try:
+        float(n)
+    except OverflowError:
+        raise argparse.ArgumentTypeError(f"value too large: {v!r}")
+    if n <= 0:
+        raise argparse.ArgumentTypeError(f"value must be a positive integer: {v!r}")
+    if n > 366 * 24 * 3600:  # > 1 year is nonsense for a demo
+        raise argparse.ArgumentTypeError(f"value too large: {v!r}")
+    return n
+
+
+def positive_float(v):
+    try:
+        x = float(v)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid float value: {v!r}")
+    if not math.isfinite(x):
+        raise argparse.ArgumentTypeError(f"value must be finite: {v!r}")
+    if x <= 0:
+        raise argparse.ArgumentTypeError(f"value must be positive: {v!r}")
+    return x
+
+
 def main():
     p = argparse.ArgumentParser(description="The complete descent: L0 → L22. As deep as we can go.")
     p.add_argument("-q", "--question", default="why did production go down last night?")
-    p.add_argument("--seconds", type=int, default=None,
+    p.add_argument("--seconds", type=positive_int, default=None,
                    help="auto-stop live loops after N seconds (default: until Ctrl+C)")
-    p.add_argument("--live", type=float, default=6.0, help="seconds per live demo section")
+    p.add_argument("--live", type=positive_float, default=6.0, help="seconds per live demo section")
     p.add_argument("--fast", action="store_true", help="4x speed")
     p.add_argument("--from", dest="from_level", default=None,
                    help="start at a level, e.g. L15 (skips earlier phases)")
@@ -728,6 +776,12 @@ def main():
     args = p.parse_args()
     if sys.stdout is None:  # fd 1 was closed before launch
         sys.exit(1)
+    for stream in (sys.stdout, sys.stderr):
+        if stream is not None and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(errors="backslashreplace")
+            except (OSError, ValueError):
+                pass
     args.speedup = 4.0 if args.fast else 1.0
     RUN["started"] = time.time()
 
@@ -751,9 +805,18 @@ def main():
             print(f"unknown level {args.from_level}; known: {', '.join(names)}")
             sys.exit(2)
 
+    global TRACE
+    try:
+        TRACE = open(args.trace, "w", encoding="utf-8", errors="backslashreplace")
+    except OSError as e:
+        print(f"cannot open trace file {args.trace}: {e}")
+        sys.exit(1)
+    TRACE.write("THE-SPIRAL COMPLETE TRACE\n" + "=" * 64 + "\n")
+    TRACE.flush()
+
     print()
-    emit(f"{col.BOLD}  🌀 THE SPIRAL {col.DIM}v1.1.1 — the complete descent · L0 → L22 · maximum depth{col.END}")
-    emit(f"  question: {col.CYAN}\"{args.question}\"{col.END}  "
+    emit(f"{col.BOLD}  🌀 THE SPIRAL {col.DIM}v1.1.3 — the complete descent · L0 → L22 · maximum depth{col.END}")
+    emit(f"  question: {col.CYAN}\"{safe_text(args.question)}\"{col.END}  "
          f"{col.DIM}(Ctrl+C any time → final report){col.END}")
 
     st4 = dict(generated=0, ctx=0, flops=0.0, secs=0.0, stopped="skipped (--from)")
@@ -785,8 +848,17 @@ def main():
 if __name__ == "__main__":
     try:
         main()
+        # flush here so a broken pipe surfaces now, not at interpreter
+        # shutdown (where it would print "Exception ignored" and exit 120)
+        if sys.stdout is not None:
+            sys.stdout.flush()
     except BrokenPipeError:
-        pass
+        # stdout went away mid-run (e.g. `| head`): exit quietly, report failure
+        try:
+            os.dup2(os.open(os.devnull, os.O_WRONLY), 1)
+        except OSError:
+            pass
+        sys.exit(1)
     except OSError:
         # stdout/stderr unavailable (closed fds, detached tty): fail quiet, not loud
         sys.exit(1)

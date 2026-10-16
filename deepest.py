@@ -27,6 +27,8 @@ Writes deepest_trace.log. Stdlib only. Numbers real; unknowns marked unknown.
 
 import argparse
 import json
+import math
+import os
 import random
 import re
 import shutil
@@ -406,7 +408,7 @@ def final_report(args, stopped_by="completed full descent"):
     emit()
 
     summary = {
-        "simulation": "deepest v1.1.1",
+        "simulation": "deepest v1.1.3",
         "stopped_by": stopped_by,
         "levels": ["nucleus", "quarks_confinement", "standard_model", "quantum_fields",
                    "measurement_problem", "planck_wall", "edge_unknowns"],
@@ -436,18 +438,37 @@ def final_report(args, stopped_by="completed full descent"):
     print()
 
 
+def positive_float(v):
+    try:
+        x = float(v)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid float value: {v!r}")
+    if not math.isfinite(x):
+        raise argparse.ArgumentTypeError(f"value must be finite: {v!r}")
+    if x <= 0:
+        raise argparse.ArgumentTypeError(f"value must be positive: {v!r}")
+    return x
+
+
 def main():
     p = argparse.ArgumentParser(description="Below the atom — as deep as physics currently goes.")
-    p.add_argument("--demo-seconds", type=int, default=6, help="length of each live demo section")
+    p.add_argument("--demo-seconds", type=positive_float, default=6,
+                   help="length of each live demo section")
     p.add_argument("--fast", action="store_true", help="4x speed")
     p.add_argument("--trace", default="deepest_trace.log")
     args = p.parse_args()
     if sys.stdout is None:  # fd 1 was closed before launch
         sys.exit(1)
+    for stream in (sys.stdout, sys.stderr):
+        if stream is not None and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(errors="backslashreplace")
+            except (OSError, ValueError):
+                pass
     args.speedup = 4.0 if args.fast else 1.0
 
     print()
-    emit(f"{col.BOLD}  🕳 DEEPEST {col.DIM}v1.1.1 — you asked 'can we go deeper than this?'")
+    emit(f"{col.BOLD}  🕳 DEEPEST {col.DIM}v1.1.3 — you asked 'can we go deeper than this?'")
     emit(f"  L14 said 'fields, then nobody knows.' let's find out where nobody knows ends.{col.END}")
 
     stopped_by = "completed full descent"
@@ -467,8 +488,17 @@ def main():
 if __name__ == "__main__":
     try:
         main()
+        # flush here so a broken pipe surfaces now, not at interpreter
+        # shutdown (where it would print "Exception ignored" and exit 120)
+        if sys.stdout is not None:
+            sys.stdout.flush()
     except BrokenPipeError:
-        pass
+        # stdout went away mid-run (e.g. `| head`): exit quietly, report failure
+        try:
+            os.dup2(os.open(os.devnull, os.O_WRONLY), 1)
+        except OSError:
+            pass
+        sys.exit(1)
     except OSError:
         # stdout/stderr unavailable (closed fds, detached tty): fail quiet, not loud
         sys.exit(1)

@@ -25,6 +25,7 @@ Stdlib only. No dependencies. Python 3.8+.
 import argparse
 import itertools
 import json
+import os
 import random
 import re
 import shutil
@@ -110,30 +111,13 @@ def bar(pct, width=14):
     return "█" * filled + "░" * (width - filled)
 
 
+def safe_text(s):
+    # neutralize control characters so question text can never emit terminal
+    # escapes or break trace layout; printable text (incl. unicode) is kept
+    return "".join(ch if 32 <= ord(ch) != 127 else f"\\x{ord(ch):02x}" for ch in s)
+
+
 def run(args):
-    width = min(WIDTH, 100)
-    trace_lines = []
-
-    def emit(line=""):
-        print(line)
-        trace_lines.append(re.sub(r"\033\[[0-9;]*m", "", line))
-
-    # ---- boot sequence -----------------------------------------------------
-    print()
-    print(f"{col.BOLD}  🧠 stuck-agent simulation {col.DIM}v1.1.1{col.END}")
-    print(f"  question: {col.CYAN}\"{args.question}\"{col.END}")
-    print()
-    for line in BOOT:
-        time.sleep(0.12 if not args.fast else 0.04)
-        if "<none" in line:
-            print(f"  {col.DIM}{line.split('.....')[0]}.....{col.END}{col.RED}{line.split('.....')[1]}{col.END}")
-        else:
-            print(f"  {col.DIM}{line}{col.END}")
-        trace_lines.append(line)
-    print(f"  {col.DIM}thinking…{col.END}")
-    print()
-
-    # ---- main loop ---------------------------------------------------------
     state = {
         "n": 0,
         "tokens": 0,
@@ -144,63 +128,98 @@ def run(args):
         "t0": time.time(),
         "stopped": "operator interrupt (Ctrl+C)",
     }
-    spin = itertools.cycle(SPINNER)  # infinite spinner, constant memory
-    next_beat = 10
-    deadline = time.time() + args.seconds if args.seconds else None
 
-    sys.stdout.write("\033[?25l")  # hide cursor
+    # the trace is spooled incrementally: an indefinite run never holds the
+    # whole session in memory, and an interrupted run keeps everything so far
     try:
-        while True:
-            if deadline and time.time() >= deadline:
-                state["stopped"] = f"timeout ({args.seconds}s) — agent was still thinking"
-                break
+        trace = open(args.trace, "w", encoding="utf-8")
+    except OSError as e:
+        print(f"  could not open trace file {args.trace}: {e}", file=sys.stderr)
+        sys.exit(1)
 
-            ch = next(spin)
-            state["n"] += 1
+    def emit(line=""):
+        print(line)
+        trace.write(re.sub(r"\033\[[0-9;]*m", "", line) + "\n")
+        trace.flush()
 
-            if state["n"] <= len(COHERENT):
-                text = COHERENT[state["n"] - 1]
-            else:
-                state["coherent_seen"] = True
-                t = random.choice(LOOP_TEMPLATES)
-                if "{n}" in t:
-                    t = t.format(n=random.randint(1, max(2, state["n"] // 3)),
-                                 t="let me think about this more carefully")
-                text = t
+    with trace:
+        trace.write("STUCK-AGENT TRACE\n" + "=" * 60 + "\n")
+        q = safe_text(args.question)
+        spin = itertools.cycle(SPINNER)  # infinite spinner, constant memory
+        next_beat = 10
+        deadline = time.time() + args.seconds if args.seconds is not None else None
 
-            state["tokens"] += est_tokens(text)
-            state["counter"][norm(text)] += 1
-            pct = state["tokens"] / CTX_BUDGET * 100
+        sys.stdout.write("\033[?25l")  # hide cursor
+        try:
+            # ---- boot sequence (Ctrl+C here still gets the post-mortem) ----
+            print()
+            print(f"{col.BOLD}  🧠 stuck-agent simulation {col.DIM}v1.1.3{col.END}")
+            print(f"  question: {col.CYAN}\"{q}\"{col.END}")
+            print()
+            for line in BOOT:
+                time.sleep(0.12 if not args.fast else 0.04)
+                if "<none" in line:
+                    print(f"  {col.DIM}{line.split('.....')[0]}.....{col.END}{col.RED}{line.split('.....')[1]}{col.END}")
+                else:
+                    print(f"  {col.DIM}{line}{col.END}")
+                trace.write(line + "\n")
+            print(f"  {col.DIM}thinking…{col.END}")
+            print()
 
-            emit(f"  {col.DIM}#{state['n']:04d}{col.END} {col.CYAN}{ch}{col.END} {text}")
+            # ---- main loop -------------------------------------------------
+            while True:
+                if deadline and time.time() >= deadline:
+                    state["stopped"] = f"timeout ({args.seconds}s) — agent was still thinking"
+                    break
 
-            # heartbeat: the loop announcing itself
-            if state["n"] >= next_beat:
-                next_beat += 10
-                state["cycle"] += 1
-                beat = (f"    {col.YELLOW}⚠ LOOP CYCLE #{state['cycle']} — conclusion identical to "
-                        f"cycle #{state['cycle'] - 1} · confidence 0.42 (unchanged) · "
-                        f"context {min(100, int(pct))}% [{bar(pct)}]{col.END}")
-                emit(beat)
-                if state["cycle"] % 3 == 0:
-                    emit(f"    {col.DIM}[internal] plan_stack depth=∞ · next_action=RE-EXAMINE · "
-                         f"last_new_idea: none recorded{col.END}")
-                if pct >= 100 and not state["ctx_full_announced"]:
-                    state["ctx_full_announced"] = True
-                    emit(f"    {col.RED}✖ context window FULL — agent continues anyway "
-                         f"(it does not notice){col.END}")
+                ch = next(spin)
+                state["n"] += 1
 
-            time.sleep(args.speed)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        sys.stdout.write("\033[?25h")  # restore cursor
-        sys.stdout.flush()
+                if state["n"] <= len(COHERENT):
+                    text = COHERENT[state["n"] - 1]
+                else:
+                    state["coherent_seen"] = True
+                    t = random.choice(LOOP_TEMPLATES)
+                    if "{n}" in t:
+                        # cap the embedded counter so the repetition table stays
+                        # bounded over arbitrarily long runs
+                        t = t.format(n=random.randint(1, min(50, max(2, state["n"] // 3))),
+                                     t="let me think about this more carefully")
+                    text = t
 
-    postmortem(state, args, trace_lines, emit)
+                state["tokens"] += est_tokens(text)
+                state["counter"][norm(text)] += 1
+                pct = state["tokens"] / CTX_BUDGET * 100
+
+                emit(f"  {col.DIM}#{state['n']:04d}{col.END} {col.CYAN}{ch}{col.END} {text}")
+
+                # heartbeat: the loop announcing itself
+                if state["n"] >= next_beat:
+                    next_beat += 10
+                    state["cycle"] += 1
+                    beat = (f"    {col.YELLOW}⚠ LOOP CYCLE #{state['cycle']} — conclusion identical to "
+                            f"cycle #{state['cycle'] - 1} · confidence 0.42 (unchanged) · "
+                            f"context {min(100, int(pct))}% [{bar(pct)}]{col.END}")
+                    emit(beat)
+                    if state["cycle"] % 3 == 0:
+                        emit(f"    {col.DIM}[internal] plan_stack depth=∞ · next_action=RE-EXAMINE · "
+                             f"last_new_idea: none recorded{col.END}")
+                    if pct >= 100 and not state["ctx_full_announced"]:
+                        state["ctx_full_announced"] = True
+                        emit(f"    {col.RED}✖ context window FULL — agent continues anyway "
+                             f"(it does not notice){col.END}")
+
+                time.sleep(args.speed)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            sys.stdout.write("\033[?25h")  # restore cursor
+            sys.stdout.flush()
+
+        postmortem(state, args, emit, trace)
 
 
-def postmortem(state, args, trace_lines, emit):
+def postmortem(state, args, emit, trace):
     elapsed = time.time() - state["t0"]
     total = state["n"]
     unique = len(state["counter"])
@@ -213,7 +232,7 @@ def postmortem(state, args, trace_lines, emit):
     emit(f"  POST-MORTEM — AGENT NEVER RETURNED")
     emit(f"  {line}{col.END}")
     emit()
-    emit(f"  question            : \"{args.question}\"")
+    emit(f"  question            : \"{safe_text(args.question)}\"")
     emit(f"  stopped by          : {state['stopped']}")
     emit(f"  time elapsed        : {timedelta(seconds=int(elapsed))}")
     emit(f"  thoughts generated  : {total:,}")
@@ -239,9 +258,9 @@ def postmortem(state, args, trace_lines, emit):
         emit(f"     {i}. {h}")
     emit()
 
-    # ---- trace file ---------------------------------------------------------
+    # ---- trace summary: commit despite a stray Ctrl+C during the write ----
     summary = {
-        "simulation": "stuck-agent v1.1.1",
+        "simulation": "stuck-agent v1.1.3",
         "question": args.question,
         "stopped_by": state["stopped"],
         "seconds": round(elapsed, 1),
@@ -255,23 +274,43 @@ def postmortem(state, args, trace_lines, emit):
         "top_repeats": dict(state["counter"].most_common(10)),
         "root_cause_hypotheses": HYPOTHESES,
     }
+
+    def commit_summary():
+        trace.write("=" * 60 + "\n")
+        trace.write("PATHOLOGY SUMMARY (JSON)\n")
+        json.dump(summary, trace, indent=2)
+        trace.write("\n")
+        trace.flush()
+
     try:
-        with open(args.trace, "w", encoding="utf-8") as f:
-            f.write("STUCK-AGENT TRACE\n")
-            f.write("=" * 60 + "\n")
-            for tl in trace_lines:
-                f.write(tl + "\n")
-            f.write("=" * 60 + "\n")
-            f.write("PATHOLOGY SUMMARY (JSON)\n")
-            json.dump(summary, f, indent=2)
-        emit(f"  {col.GREEN}✔ trace written to {args.trace}{col.END}")
-    except OSError as e:
-        emit(f"  {col.RED}✖ could not write trace: {e}{col.END}")
-        sys.exit(1)
+        commit_summary()
+    except KeyboardInterrupt:
+        # finish the commit despite the interrupt; a second one aborts quietly
+        try:
+            commit_summary()
+        except KeyboardInterrupt:
+            sys.exit(130)
+    emit(f"  {col.GREEN}✔ trace written to {args.trace}{col.END}")
     emit()
     emit(f"  {col.DIM}next step: hand the trace file to another agent and ask it to")
     emit(f"  find the issues in this process.{col.END}")
     print()
+
+
+def positive_int(v):
+    try:
+        n = int(v)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid int value: {v!r}")
+    try:
+        float(n)
+    except OverflowError:
+        raise argparse.ArgumentTypeError(f"value too large: {v!r}")
+    if n <= 0:
+        raise argparse.ArgumentTypeError(f"value must be a positive integer: {v!r}")
+    if n > 366 * 24 * 3600:  # > 1 year is nonsense for a demo
+        raise argparse.ArgumentTypeError(f"value too large: {v!r}")
+    return n
 
 
 def main():
@@ -279,20 +318,39 @@ def main():
         description="Simulate an AI agent that never comes back. Ctrl+C for post-mortem.")
     p.add_argument("-q", "--question", default="Should we refactor the auth module before launch?",
                    help="the question the agent will never answer")
-    p.add_argument("--seconds", type=int, default=None,
+    p.add_argument("--seconds", type=positive_int, default=None,
                    help="auto-stop after N seconds and run the post-mortem")
     p.add_argument("--fast", action="store_true", help="3.5x simulation speed")
     p.add_argument("--trace", default="stuck_agent_trace.log", help="trace output path")
     args = p.parse_args()
     if sys.stdout is None:  # fd 1 was closed before launch
         sys.exit(1)
+    for stream in (sys.stdout, sys.stderr):
+        if stream is not None and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(errors="backslashreplace")
+            except (OSError, ValueError):
+                pass
     args.speed = 0.08 if args.fast else 0.28
+
+    def _devnull_stdout():
+        try:
+            os.dup2(os.open(os.devnull, os.O_WRONLY), 1)
+        except OSError:
+            pass
+
     try:
         run(args)
+        # flush here so a broken pipe surfaces now, not at interpreter
+        # shutdown (where it would print "Exception ignored" and exit 120)
+        if sys.stdout is not None:
+            sys.stdout.flush()
     except BrokenPipeError:
-        pass
+        # stdout went away mid-run (e.g. `| head`): exit quietly, report failure
+        _devnull_stdout()
+        sys.exit(1)
     except OSError:
-        # stdout/stderr unavailable (closed fds, detached tty): fail quiet, not loud
+        # stdout/stderr unavailable (closed fds, detached tty): fail quiet
         sys.exit(1)
 
 

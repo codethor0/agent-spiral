@@ -30,6 +30,8 @@ Numbers: H100-class hardware, 8B fp16 model, simplified but real.
 
 import argparse
 import json
+import math
+import os
 import random
 import re
 import shutil
@@ -296,7 +298,7 @@ def l12_transistor(args):
     t0 = time.time()
     cycles = 0
     colons = 0
-    deadline = time.time() + args.seconds if args.seconds else None
+    deadline = time.time() + args.seconds if args.seconds is not None else None
     stopped = "operator interrupt (Ctrl+C)"
     sys.stdout.write("\033[?25l")
     try:
@@ -317,7 +319,7 @@ def l12_transistor(args):
     finally:
         sys.stdout.write("\033[?25h")
         sys.stdout.flush()
-        sys.stdout.write("\r" + " " * 78 + "\r")
+        sys.stdout.write("\r\033[2K")  # EL: erase whole line, any terminal width
 
     secs = time.time() - t0
     return dict(cycles=cycles, secs=secs, stopped=stopped)
@@ -401,7 +403,7 @@ def descent_report(args, st):
     emit()
 
     summary = {
-        "simulation": "deeper-than-this v1.1.1",
+        "simulation": "deeper-than-this v1.1.3",
         "stopped_by": st["stopped"],
         "levels": ["orchestrator", "cuda_kernel", "tensor_core", "fp16_number",
                    "memory_hierarchy", "dram_cell", "transistor", "silicon_electrons", "bottom_fields"],
@@ -431,20 +433,55 @@ def descent_report(args, st):
     print()
 
 
+def positive_int(v):
+    try:
+        n = int(v)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid int value: {v!r}")
+    try:
+        float(n)
+    except OverflowError:
+        raise argparse.ArgumentTypeError(f"value too large: {v!r}")
+    if n <= 0:
+        raise argparse.ArgumentTypeError(f"value must be a positive integer: {v!r}")
+    if n > 366 * 24 * 3600:  # > 1 year is nonsense for a demo
+        raise argparse.ArgumentTypeError(f"value too large: {v!r}")
+    return n
+
+
+def positive_float(v):
+    try:
+        x = float(v)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid float value: {v!r}")
+    if not math.isfinite(x):
+        raise argparse.ArgumentTypeError(f"value must be finite: {v!r}")
+    if x <= 0:
+        raise argparse.ArgumentTypeError(f"value must be positive: {v!r}")
+    return x
+
+
 def main():
     p = argparse.ArgumentParser(description="Descend below the GPU, as deep as physics allows.")
-    p.add_argument("--seconds", type=int, default=None,
+    p.add_argument("--seconds", type=positive_int, default=None,
                    help="run the final transistor clock loop for N seconds (default: until Ctrl+C)")
-    p.add_argument("--demo-seconds", type=int, default=6, help="length of each live demo section")
+    p.add_argument("--demo-seconds", type=positive_float, default=6,
+                   help="length of each live demo section")
     p.add_argument("--fast", action="store_true", help="4x speed")
     p.add_argument("--trace", default="deeper_trace.log")
     args = p.parse_args()
     if sys.stdout is None:  # fd 1 was closed before launch
         sys.exit(1)
+    for stream in (sys.stdout, sys.stderr):
+        if stream is not None and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(errors="backslashreplace")
+            except (OSError, ValueError):
+                pass
     args.speedup = 4.0 if args.fast else 1.0
 
     print()
-    emit(f"{col.BOLD}  🔻 DEEPER THAN THIS {col.DIM}v1.1.1 — stack_spiral ended at the GPU. that was the foyer.{col.END}")
+    emit(f"{col.BOLD}  🔻 DEEPER THAN THIS {col.DIM}v1.1.3 — stack_spiral ended at the GPU. that was the foyer.{col.END}")
     emit(f"  {col.DIM}same question riding all the way down: \"why did production go down?\"{col.END}")
 
     st = dict(cycles=0, secs=0.0, stopped="operator interrupt (Ctrl+C)")
@@ -459,15 +496,25 @@ def main():
         l13_electrons(args, st)
         l14_bottom(args)
     except KeyboardInterrupt:
-        pass  # any Ctrl+C before the final loop still gets the descent report
+        # any Ctrl+C anywhere still gets the descent report, labeled correctly
+        st["stopped"] = "operator interrupt (Ctrl+C)"
     descent_report(args, st)
 
 
 if __name__ == "__main__":
     try:
         main()
+        # flush here so a broken pipe surfaces now, not at interpreter
+        # shutdown (where it would print "Exception ignored" and exit 120)
+        if sys.stdout is not None:
+            sys.stdout.flush()
     except BrokenPipeError:
-        pass
+        # stdout went away mid-run (e.g. `| head`): exit quietly, report failure
+        try:
+            os.dup2(os.open(os.devnull, os.O_WRONLY), 1)
+        except OSError:
+            pass
+        sys.exit(1)
     except OSError:
         # stdout/stderr unavailable (closed fds, detached tty): fail quiet, not loud
         sys.exit(1)

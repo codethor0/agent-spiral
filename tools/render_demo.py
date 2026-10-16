@@ -40,6 +40,8 @@ class Term:
                      for _ in range(rows)]
         self.r = self.c = 0
         self.fg, self.bg, self.bold = DEFAULT_FG, DEFAULT_BG, False
+        self.pending = ""        # incomplete escape sequence across feed() calls
+        self.wrap_pending = False  # deferred autowrap at the right margin
 
     def scroll(self):
         self.grid.pop(0)
@@ -47,17 +49,20 @@ class Term:
         self.r = self.rows - 1
 
     def put(self, ch):
+        if self.wrap_pending:
+            self.wrap_pending = False
+            self.newline()
         if 0 <= self.r < self.rows and 0 <= self.c < self.cols:
             self.grid[self.r][self.c] = (ch, self.fg, self.bg, self.bold)
-        self.c += 1
-        if self.c >= self.cols:
-            self.c = 0
-            self.r += 1
-            if self.r >= self.rows:
-                self.scroll()
+        if self.c >= self.cols - 1:
+            self.c = self.cols - 1
+            self.wrap_pending = True   # stay on the last column until the next char
+        else:
+            self.c += 1
 
     def newline(self):
         self.c = 0
+        self.wrap_pending = False
         self.r += 1
         if self.r >= self.rows:
             self.scroll()
@@ -104,18 +109,25 @@ class Term:
         self.r = self.c = 0
 
     def feed(self, text):
+        # re-attach an escape sequence split across feed() calls
+        text = self.pending + text
+        self.pending = ""
         i = 0
-        while i < len(text):
+        n = len(text)
+        while i < n:
             ch = text[i]
-            if ch == "\x1b" and i + 1 < len(text) and text[i + 1] == "[":
+            if ch == "\x1b" and i + 1 < n and text[i + 1] == "[":
                 j = i + 2
-                while j < len(text) and not ("@" <= text[j] <= "~"):
+                while j < n and not ("@" <= text[j] <= "~"):
                     j += 1
-                if j >= len(text):
+                if j >= n:
+                    self.pending = text[i:]
                     break
                 raw = text[i + 2:j]
                 fin = text[j]
-                params = [int(x) if x else 0 for x in raw.replace("?", "").split(";")] if raw else [0]
+                # unknown/non-numeric parameters (e.g. ESC[!p) degrade to 0
+                params = [int(x) if x.isdigit() else 0
+                          for x in raw.replace("?", "").split(";")] if raw else [0]
                 if fin == "m":
                     self.sgr(params)
                 elif fin == "K":
@@ -126,14 +138,33 @@ class Term:
                     self.r = max(0, self.r - (params[0] or 1))
                 elif fin == "C":
                     self.c = min(self.cols - 1, self.c + (params[0] or 1))
+                # other final bytes (p, H, etc.): consumed, not rendered
                 i = j + 1
                 continue
+            if ch == "\x1b" and i + 1 < n and text[i + 1] == "]":
+                # OSC (title, etc.): skip to BEL or the next ESC
+                j = text.find("\a", i + 2)
+                if j < 0:
+                    j = text.find("\x1b", i + 2)
+                if j < 0:
+                    self.pending = text[i:]
+                    break
+                i = j + 1
+                continue
+            if ch == "\x1b":
+                if i + 1 >= n:
+                    self.pending = text[i:]  # lone ESC at chunk end
+                    break
+                i += 1  # unsupported two-byte sequence: drop the ESC
+                continue
+            self.wrap_pending = False if ch in "\r\n\b" else self.wrap_pending
             if ch == "\r":
                 self.c = 0
             elif ch == "\n":
                 self.newline()
             elif ch == "\b":
                 self.c = max(0, self.c - 1)
+                self.wrap_pending = False
             elif ch == "\t":
                 self.c = min(self.cols - 1, (self.c // 8 + 1) * 8)
             elif ch >= " ":
@@ -144,35 +175,40 @@ class Term:
         return tuple(tuple(row) for row in self.grid)
 
 
-def render(frames, out_path, font_path, cell_w=9, cell_h=18, font_px=14):
+def render(samples, out_path, font_path, cell_w=9, cell_h=18, font_px=14):
+    if not samples:
+        raise SystemExit("no frames rendered")
+    # a screen is visible from its own timestamp until the next screen's
+    # timestamp; the final screen holds for the tail of the recording
+    holds = [samples[i + 1][0] - samples[i][0] for i in range(len(samples) - 1)]
+    tail = samples[-1][0] - samples[-2][0] if len(samples) > 1 else 1.0
+    holds.append(max(tail, 1.0))
+    # merge consecutive identical screens (full state: chars + colors + bold)
+    screens = []  # [snapshot, total_ms]
+    for (_, snap), hold in zip(samples, holds):
+        ms = max(int(hold * 1000), 20)
+        if screens and screens[-1][0] == snap:
+            screens[-1][1] += ms
+        else:
+            screens.append([snap, ms])
     font = ImageFont.truetype(font_path, font_px)
-    cols, rows = frames[0][1].cols, frames[0][1].rows
+    cols, rows = len(screens[0][0][0]), len(screens[0][0])
     img_w, img_h = cols * cell_w, rows * cell_h
     images, durations = [], []
-    prev_key, prev_t = None, None
-    for t, term in frames:
-        snap = term.snapshot()
-        key = tuple(tuple(c for c, _, _, _ in row) for row in snap)
-        if prev_key is not None and key == prev_key:
-            durations[-1] += t - prev_t
-        else:
-            img = Image.new("RGB", (img_w, img_h), DEFAULT_BG)
-            d = ImageDraw.Draw(img)
-            for y, row in enumerate(snap):
-                for x, (ch, fg, bg, bold) in enumerate(row):
-                    px, py = x * cell_w, y * cell_h
-                    if bg != DEFAULT_BG:
-                        d.rectangle([px, py, px + cell_w - 1, py + cell_h - 1], fill=bg)
-                    color = fg
-                    if bold:
-                        color = tuple(min(255, v + 30) for v in fg)
-                    d.text((px, py), ch, font=font, fill=color)
-            images.append(img)
-            durations.append(t if prev_t is None else t - prev_t)
-        prev_key, prev_t = key, t
-    if not images:
-        raise SystemExit("no frames rendered")
-    durations = [max(int(d * 1000), 20) for d in durations]
+    for snap, ms in screens:
+        img = Image.new("RGB", (img_w, img_h), DEFAULT_BG)
+        d = ImageDraw.Draw(img)
+        for y, row in enumerate(snap):
+            for x, (ch, fg, bg, bold) in enumerate(row):
+                px, py = x * cell_w, y * cell_h
+                if bg != DEFAULT_BG:
+                    d.rectangle([px, py, px + cell_w - 1, py + cell_h - 1], fill=bg)
+                color = fg
+                if bold:
+                    color = tuple(min(255, v + 30) for v in fg)
+                d.text((px, py), ch, font=font, fill=color)
+        images.append(img)
+        durations.append(ms)
     # quantize each frame BEFORE saving: passing palette args at save time with
     # RGB frames corrupts Pillow's multi-frame delta encoding (ghost frames)
     palette_images = [im.convert("P", palette=Image.ADAPTIVE, colors=128)
@@ -204,23 +240,36 @@ def default_font():
 def main():
     cast_path, out_path = sys.argv[1], sys.argv[2]
     font_path = sys.argv[3] if len(sys.argv) > 3 else default_font()
-    lines = open(cast_path, encoding="utf-8").read().splitlines()
-    hdr = json.loads(lines[0])
-    term = Term(hdr["width"], hdr["height"])
-    frames = []
-    last_t = 0.0
-    for line in lines[1:]:
-        t, _, data = json.loads(line)
+    try:
+        lines = open(cast_path, encoding="utf-8").read().splitlines()
+    except OSError as e:
+        sys.exit(f"cannot read {cast_path}: {e}")
+    try:
+        hdr = json.loads(lines[0])
+        cols, rows = int(hdr["width"]), int(hdr["height"])
+    except (IndexError, KeyError, TypeError, ValueError) as e:
+        sys.exit(f"malformed cast header in {cast_path}: {e}")
+    term = Term(cols, rows)
+    samples = []   # (timestamp, snapshot)
+    last_t, final_t = 0.0, 0.0
+    for n, line in enumerate(lines[1:], 2):
+        if not line.strip():
+            continue
+        try:
+            t, ev, data = json.loads(line)
+        except ValueError as e:
+            sys.exit(f"malformed cast event line {n} in {cast_path}: {e}")
+        if ev != "o":
+            continue   # input, markers, resize: not terminal output
         term.feed(data)
+        final_t = max(final_t, float(t))
         if t - last_t >= 0.12:
-            frames.append((t, Term(hdr["width"], hdr["height"])))
-            frames[-1][1].grid = [list(r) for r in term.grid]
-            frames[-1][1].r, frames[-1][1].c = term.r, term.c
-            frames[-1][1].fg, frames[-1][1].bg, frames[-1][1].bold = \
-                term.fg, term.bg, term.bold
+            samples.append((float(t), term.snapshot()))
             last_t = t
-    frames.append((json.loads(lines[-1])[0], frames[-1][1]))
-    render(frames, out_path, font_path)
+    # always include the true final terminal state, even on a short cast
+    samples.append((max(final_t, samples[-1][0] if samples else 0.0),
+                    term.snapshot()))
+    render(samples, out_path, font_path)
 
 
 if __name__ == "__main__":

@@ -33,6 +33,7 @@ Stdlib only. Numbers are simplified-but-real (8B-class model, fp16, GQA).
 import argparse
 import json
 import math
+import os
 import random
 import re
 import shutil
@@ -61,12 +62,24 @@ class col:
     END = "\033[0m"
 
 
-LOG = []
+TRACE = None  # trace file spooled incrementally; opened in main()
+
+
+def safe_text(s):
+    # neutralize control characters so question text can never emit terminal
+    # escapes or break trace layout; printable text (incl. unicode) is kept
+    return "".join(ch if 32 <= ord(ch) != 127 else f"\\x{ord(ch):02x}" for ch in s)
 
 
 def emit(s=""):
     print(s)
-    LOG.append(re.sub(r"\033\[[0-9;]*m", "", s))
+    line = re.sub(r"\033\[[0-9;]*m", "", s)
+    if TRACE is not None and not TRACE.closed:
+        try:
+            TRACE.write(line + "\n")
+            TRACE.flush()
+        except OSError:
+            pass  # trace loss must never kill the simulation
 
 
 def pause(args, s):
@@ -89,7 +102,7 @@ def layer_wire(args):
     pause(args, 0.3)
     emit(f"  └─► POST /v1/chat/completions  HTTP/2  TLS 1.3  api.example.ai:443")
     pause(args, 0.3)
-    emit(f"      payload: {{\"model\": \"agent-1\", \"messages\": [user: \"{args.question[:46]}\"]}}")
+    emit(f"      payload: {{\"model\": \"agent-1\", \"messages\": [user: \"{safe_text(args.question)[:46]}\"]}}")
     emit(f"      {col.DIM}~1.2 KB chopped into TCP segments → NIC → fiber → load balancer{col.END}")
     pause(args, 0.4)
     emit(f"  load balancer ──► scheduler queue  {col.DIM}[position #2]{col.END}")
@@ -196,12 +209,12 @@ def layer_spiral(args, prompt_ids):
     generated = 0
     tokens_seen = list(prompt_ids)
     recent = deque(maxlen=48)
-    gen_stream = []
+    gen_stream = deque(maxlen=64)
     rep_counter = Counter()
     flops_total = 0.0
     t0 = time.time()
     tok_speed = 190.0
-    deadline = time.time() + args.seconds if args.seconds else None
+    deadline = time.time() + args.seconds if args.seconds is not None else None
     budget_usd_per_s = 2.0 / 3600.0  # $2/GPU-hour rental
     spin = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
     si = 0
@@ -234,7 +247,7 @@ def layer_spiral(args, prompt_ids):
             tok_speed = max(40.0, 190.0 - ctx * 0.004)
 
             if generated % 6 == 0:
-                frag = "".join(gen_stream[-30:])
+                frag = "".join(list(gen_stream)[-30:])
                 frag = frag if len(frag) <= 70 else "…" + frag[-68:]
                 emit(f"  {col.DIM}{spin[si % len(spin)]}{col.END} stream: \"{col.CYAN}{frag}{col.END}\"")
 
@@ -334,7 +347,7 @@ def postmortem(args, st):
     emit(f"  {col.DIM}the spiral lives in the gap between 'no layer failed' and 'nobody stopped it'.{col.END}")
 
     summary = {
-        "simulation": "agent-stack-spiral v1.1.1",
+        "simulation": "agent-stack-spiral v1.1.3",
         "question": args.question,
         "stopped_by": st["stopped"],
         "seconds": round(st["secs"], 1),
@@ -347,13 +360,19 @@ def postmortem(args, st):
         "distinct_output_tokens": len(st["rep"]),
         "postmortem": [{"layer": n, "should": s, "did": d, "fix": f} for n, s, d, f in POSTMORTEM],
     }
+    payload = ("=" * 64 + "\nSUMMARY (JSON)\n" + json.dumps(summary, indent=2) + "\n")
     try:
-        with open(args.trace, "w", encoding="utf-8") as f:
-            f.write("AGENT-STACK-SPIRAL TRACE\n" + "=" * 64 + "\n")
-            for l in LOG:
-                f.write(l + "\n")
-            f.write("=" * 64 + "\nSUMMARY (JSON)\n")
-            json.dump(summary, f, indent=2)
+        try:
+            TRACE.write(payload)
+            TRACE.flush()
+        except KeyboardInterrupt:
+            # finish the trace anyway; only a second Ctrl+C aborts the write
+            try:
+                TRACE.write(payload)
+                TRACE.flush()
+            except KeyboardInterrupt:
+                sys.exit(130)
+        TRACE.close()
         emit(f"  {col.GREEN}✔ trace written to {args.trace}{col.END}")
     except OSError as e:
         emit(f"  {col.RED}✖ trace write failed: {e}{col.END}")
@@ -362,20 +381,52 @@ def postmortem(args, st):
     print()
 
 
+def positive_int(v):
+    try:
+        n = int(v)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid int value: {v!r}")
+    try:
+        float(n)
+    except OverflowError:
+        raise argparse.ArgumentTypeError(f"value too large: {v!r}")
+    if n <= 0:
+        raise argparse.ArgumentTypeError(f"value must be a positive integer: {v!r}")
+    if n > 366 * 24 * 3600:  # > 1 year is nonsense for a demo
+        raise argparse.ArgumentTypeError(f"value too large: {v!r}")
+    return n
+
+
 def main():
     p = argparse.ArgumentParser(description="Full-stack visualization of an agent that never comes back.")
     p.add_argument("-q", "--question", default="why did production go down last night?")
-    p.add_argument("--seconds", type=int, default=None, help="decode loop runtime before post-mortem")
+    p.add_argument("--seconds", type=positive_int, default=None,
+                   help="decode loop runtime before post-mortem")
     p.add_argument("--fast", action="store_true", help="4x speed")
     p.add_argument("--trace", default="stack_spiral_trace.log")
     args = p.parse_args()
     if sys.stdout is None:  # fd 1 was closed before launch
         sys.exit(1)
+    for stream in (sys.stdout, sys.stderr):
+        if stream is not None and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(errors="backslashreplace")
+            except (OSError, ValueError):
+                pass
     args.speedup = 4.0 if args.fast else 1.0
 
+    global TRACE
+    try:
+        TRACE = open(args.trace, "w", encoding="utf-8", errors="backslashreplace")
+    except OSError as e:
+        print(f"cannot open trace file {args.trace}: {e}")
+        sys.exit(1)
+    TRACE.write("AGENT-STACK-SPIRAL TRACE\n" + "=" * 64 + "\n")
+    TRACE.flush()
+
     print()
-    emit(f"{col.BOLD}  ⚡ AGENT STACK SPIRAL {col.DIM}v1.1.1 — descent into an agent that never comes back{col.END}")
-    emit(f"  question: {col.CYAN}\"{args.question}\"{col.END}")
+    emit(f"{col.BOLD}  ⚡ AGENT STACK SPIRAL {col.DIM}v1.1.3 — descent into an agent that never comes back{col.END}")
+    emit(f"  question: {col.CYAN}\"{safe_text(args.question)}\"{col.END}")
 
     st = dict(secs=0.0, generated=0, ctx=0, flops=0.0, energy_wh=0.0, cost=0.0,
               rep=Counter(), stopped="operator interrupt (Ctrl+C)")
@@ -387,15 +438,25 @@ def main():
         st = layer_spiral(args, ids)
         layer_wire_back(args, st)
     except KeyboardInterrupt:
-        pass  # any Ctrl+C before the decode loop still gets the post-mortem
+        # any Ctrl+C anywhere still gets the post-mortem, labeled correctly
+        st["stopped"] = "operator interrupt (Ctrl+C)"
     postmortem(args, st)
 
 
 if __name__ == "__main__":
     try:
         main()
+        # flush here so a broken pipe surfaces now, not at interpreter
+        # shutdown (where it would print "Exception ignored" and exit 120)
+        if sys.stdout is not None:
+            sys.stdout.flush()
     except BrokenPipeError:
-        pass
+        # stdout went away mid-run (e.g. `| head`): exit quietly, report failure
+        try:
+            os.dup2(os.open(os.devnull, os.O_WRONLY), 1)
+        except OSError:
+            pass
+        sys.exit(1)
     except OSError:
         # stdout/stderr unavailable (closed fds, detached tty): fail quiet, not loud
         sys.exit(1)
