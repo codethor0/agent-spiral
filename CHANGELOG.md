@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.2 - 2026-10-16
+
+- Harden stdout handling in all five simulations: running with fd 1 closed
+  or lost mid-run now exits 1 silently instead of raising a traceback.
+  Found by adversarial pre-release review (closed-stdout edge case).
+
 ## 1.1.1 - 2026-10-16
 
 - Fix energy figure in the_spiral.py L4 status line (Wh conversion was

@@ -726,6 +726,8 @@ def main():
                    help="start at a level, e.g. L15 (skips earlier phases)")
     p.add_argument("--trace", default="the_spiral_trace.log")
     args = p.parse_args()
+    if sys.stdout is None:  # fd 1 was closed before launch
+        sys.exit(1)
     args.speedup = 4.0 if args.fast else 1.0
     RUN["started"] = time.time()
 
@@ -785,3 +787,6 @@ if __name__ == "__main__":
         main()
     except BrokenPipeError:
         pass
+    except OSError:
+        # stdout/stderr unavailable (closed fds, detached tty): fail quiet, not loud
+        sys.exit(1)

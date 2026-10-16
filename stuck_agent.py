@@ -284,11 +284,16 @@ def main():
     p.add_argument("--fast", action="store_true", help="3.5x simulation speed")
     p.add_argument("--trace", default="stuck_agent_trace.log", help="trace output path")
     args = p.parse_args()
+    if sys.stdout is None:  # fd 1 was closed before launch
+        sys.exit(1)
     args.speed = 0.08 if args.fast else 0.28
     try:
         run(args)
     except BrokenPipeError:
         pass
+    except OSError:
+        # stdout/stderr unavailable (closed fds, detached tty): fail quiet, not loud
+        sys.exit(1)
 
 
 if __name__ == "__main__":
