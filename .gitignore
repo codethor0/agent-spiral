@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# runtime trace outputs (the sample trace in traces/ is tracked)
+*_trace.log

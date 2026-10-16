@@ -1,6 +1,15 @@
 # agent-spiral
 
+![license](https://img.shields.io/badge/license-MIT-green)
+![python](https://img.shields.io/badge/python-3.8%2B-blue)
+![deps](https://img.shields.io/badge/dependencies-none-brightgreen)
+![platform](https://img.shields.io/badge/platform-linux%20%7C%20macos-lightgrey)
+
 Terminal simulations of an AI agent that never comes back.
+
+<p>
+  <img src="docs/demo.gif" alt="agent-spiral demo: the complete descent from HTTP request to Planck scale" width="780">
+</p>
 
 A question is asked. The agent starts reasoning, and the reasoning becomes a
 loop. These programs follow that failure from the HTTP request all the way
@@ -32,6 +41,11 @@ python3 stuck_agent.py -q "your question"
 ```
 
 No dependencies. Standard library only. Python 3.8+.
+
+## Demo
+
+`docs/demo.gif` is a real recording of `the_spiral.py --fast --live 1 --seconds 1`
+(12 seconds, real colors). To re-record it, see `tools/render_demo.py`.
 
 ## What a run produces
 
@@ -73,6 +87,8 @@ agent_stack_spiral.py     full application stack simulation
 deeper_than_this.py       below the GPU: hardware layers
 deepest.py                below the atom: physics layers
 the_spiral.py             unified complete descent L0-L22
+docs/demo.gif             recorded demo of the_spiral.py
+tools/                    demo recording and GIF rendering
 traces/sample-trace.log   example trace output
 ```
 

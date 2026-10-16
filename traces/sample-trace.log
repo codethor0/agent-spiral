@@ -1,0 +1,534 @@
+THE-SPIRAL COMPLETE TRACE
+================================================================
+  🌀 THE SPIRAL v1.0 — the complete descent · L0 → L22 · maximum depth
+  question: "why did production go down last night?"  (Ctrl+C any time → final report)
+
+┌─ L0 · THE WIRE — where your words physically go ──────────────────────────────────────────
+│  you press Enter → POST /v1/chat/completions, HTTP/2, TLS 1.3.
+│  ~1.2 KB in TCP segments → NIC → fiber → load balancer → scheduler queue.
+│  ✔ ~38 ms. the question is inside a datacenter. nobody armed the 'decides it's done' part.
+
+┌─ L1 · TOKENIZER — text stops being text ──────────────────────────────────────────────────
+│  tokens: 'why' 'did' 'production' 'go' 'down' 'last' 'night' '?'
+│  ids   : [3808, 62627, 19605, 13604, 101318, 17690, 6828, 63]
+│  8 tokens in. every token out costs real compute.
+
+┌─ L2 · GPU — the machine your question now lives in ───────────────────────────────────────
+│  H100 · 80 GB HBM3 · ~700 W · 3.35 TB/s
+│  weights: 8B × 2 bytes = 14.9 GiB resident, loaded once at boot. never reload.
+│  KV cache pool: 24.4 GiB (128 KiB/token × 200k) — the context window IS spare VRAM.
+│  ✔ model resident. KV zeroed. ready.
+
+┌─ L3 · ONE DECODE STEP — what 'thinking' is physically ────────────────────────────────────
+│  ×32 layers per token
+│    q,k,v = h·W_qkv → attn = softmax(q·kᵀ/√d)·v ← reads EVERY past k,v
+│    MLP → logits = h·W_unembed [4096→128256] → softmax(T=0.7) → 1 token → repeat
+│  ≈16 GFLOP/token + an attention tax that grows with context. there is only this loop.
+
+┌─ L4 · DECODE LOOP — prefill done. now it generates… forever ──────────────────────────────
+│  sampling: temp=0.7 · rep_penalty=1.0 (OFF) · max_tokens=null · stop_strings=[]
+│  decode begins. watch what never fires.
+│  ⠿ stream: "wait, let me reconsider that"
+│  ⠿ stream: "wait, let me reconsider that… actually— hold on what"
+│  ⠿ stream: "…reconsider that… actually— hold on what if the premise is wrong?"
+
+│  ── status ── gen=18 · ctx=26 · KV=0.00 GiB · 190 tok/s
+│     eos p ≈ 0.0003 (never rises) · 4-gram peak "wait, let me" ×1 → penalty=1.0
+│     GPU util 97% (working perfectly) · energy 0.07 Wh · bill $0.0001
+│  ⠿ stream: "…old on what if the premise is wrong?wait, let me reconsider that"
+│  ⠿ stream: "…se is wrong?wait, let me reconsider that… actually— hold on what"
+│  ⠿ stream: "…reconsider that… actually— hold on what if the premise is wrong?"
+
+│  ── status ── gen=36 · ctx=44 · KV=0.01 GiB · 190 tok/s
+│     eos p ≈ 0.0003 (never rises) · 4-gram peak "wait, let me" ×2 → penalty=1.0
+│     GPU util 97% (working perfectly) · energy 0.14 Wh · bill $0.0001
+│  ⠿ stream: "…old on what if the premise is wrong?wait, let me reconsider that"
+│  ⠿ stream: "…se is wrong?wait, let me reconsider that… actually— hold on what"
+│  ⠿ stream: "…reconsider that… actually— hold on what if the premise is wrong?"
+
+│  ── status ── gen=54 · ctx=62 · KV=0.01 GiB · 190 tok/s
+│     eos p ≈ 0.0003 (never rises) · 4-gram peak "… actually— hold" ×3 → penalty=1.0
+│     GPU util 97% (working perfectly) · energy 0.21 Wh · bill $0.0002
+│  ⠿ stream: "…old on what if the premise is wrong?wait, let me reconsider that"
+│  ⠿ stream: "…se is wrong?wait, let me reconsider that… actually— hold on what"
+│  ⠿ stream: "…reconsider that… actually— hold on what if the premise is wrong?"
+
+│  ── status ── gen=72 · ctx=80 · KV=0.01 GiB · 190 tok/s
+│     eos p ≈ 0.0003 (never rises) · 4-gram peak "… actually— hold" ×3 → penalty=1.0
+│     GPU util 97% (working perfectly) · energy 0.28 Wh · bill $0.0002
+│  ⠿ stream: "…old on what if the premise is wrong?wait, let me reconsider that"
+│  ⠿ stream: "…se is wrong?wait, let me reconsider that… actually— hold on what"
+│  ⠿ stream: "…reconsider that… actually— hold on what if the premise is wrong?"
+
+│  ── status ── gen=90 · ctx=98 · KV=0.01 GiB · 190 tok/s
+│     eos p ≈ 0.0003 (never rises) · 4-gram peak "… actually— hold" ×3 → penalty=1.0
+│     GPU util 97% (working perfectly) · energy 0.35 Wh · bill $0.0003
+│  ⠿ stream: "…old on what if the premise is wrong?wait, let me reconsider that"
+│  ⠿ stream: "…se is wrong?wait, let me reconsider that… actually— hold on what"
+│  ⠿ stream: "…reconsider that… actually— hold on what if the premise is wrong?"
+
+│  ── status ── gen=108 · ctx=116 · KV=0.01 GiB · 190 tok/s
+│     eos p ≈ 0.0003 (never rises) · 4-gram peak "… actually— hold" ×3 → penalty=1.0
+│     GPU util 97% (working perfectly) · energy 0.42 Wh · bill $0.0003
+│  ⠿ stream: "…old on what if the premise is wrong?wait, let me reconsider that"
+│  ⠿ stream: "…se is wrong?wait, let me reconsider that… actually— hold on what"
+│  ⠿ stream: "…reconsider that… actually— hold on what if the premise is wrong?"
+
+│  ── status ── gen=126 · ctx=134 · KV=0.02 GiB · 189 tok/s
+│     eos p ≈ 0.0003 (never rises) · 4-gram peak "… actually— hold" ×3 → penalty=1.0
+│     GPU util 97% (working perfectly) · energy 0.49 Wh · bill $0.0004
+│  ⠿ stream: "…old on what if the premise is wrong?wait, let me reconsider that"
+│  ⠿ stream: "…se is wrong?wait, let me reconsider that… actually— hold on what"
+│  ⠿ stream: "…reconsider that… actually— hold on what if the premise is wrong?"
+
+│  ── status ── gen=144 · ctx=152 · KV=0.02 GiB · 189 tok/s
+│     eos p ≈ 0.0003 (never rises) · 4-gram peak "… actually— hold" ×3 → penalty=1.0
+│     GPU util 97% (working perfectly) · energy 0.56 Wh · bill $0.0004
+│  ⠿ stream: "…old on what if the premise is wrong?wait, let me reconsider that"
+│  ⠿ stream: "…se is wrong?wait, let me reconsider that… actually— hold on what"
+│  ⠿ stream: "…reconsider that… actually— hold on what if the premise is wrong?"
+
+│  ── status ── gen=162 · ctx=170 · KV=0.02 GiB · 189 tok/s
+│     eos p ≈ 0.0003 (never rises) · 4-gram peak "… actually— hold" ×3 → penalty=1.0
+│     GPU util 97% (working perfectly) · energy 0.64 Wh · bill $0.0005
+│  ⠿ stream: "…old on what if the premise is wrong?wait, let me reconsider that"
+│  ⠿ stream: "…se is wrong?wait, let me reconsider that… actually— hold on what"
+
+┌─ L5 · THE WIRE BACK — your terminal, still waiting ───────────────────────────────────────
+│  SSE stream open. heartbeats keep every timeout alive. client: spinner,
+│  no read timeout set. server: batch slot held. billing: per token.
+│  nothing is broken anywhere. that's the terrifying part.
+
+┌─ L6 · THE ORCHESTRATOR — the loop lives where meaning lives ──────────────────────────────
+│  vLLM-style server · CUDA graphs · continuous batching
+│  the loop isn't a for-statement a human wrote — it's a scheduler calling
+│  generate() forever because nothing defines 'done'. the only layer
+│  where 'meaning' still exists — the only layer where the loop can be broken.
+│  watchdog inventory: client 0 · gateway 0 · scheduler 0 · sampler 0
+│  in field sessions, the only layer that ever stops the loop is the human:
+│  Ctrl+C, 4/4. the human layer outperformed every automated layer.
+
+┌─ L7 · CUDA KERNEL — the spiral, written in C ─────────────────────────────────────────────
+│  gridDim [165] · blockDim [256] · each thread: for (k=0; k<K; k+=16) accumulate(A×B)
+│  a nested for-loop: K-loop inside, grid outside. the K-loop exits. the
+│  outer one was never given an exit. ~40 launches/token, forever.
+
+┌─ L8 · TENSOR CORE — 2 billion ticks/second of pure obedience ─────────────────────────────
+│  132 SMs · HMMA.m16n8k16 = 4,096 FLOP/issue
+│  one token = 3,906,250 MMAs. pure math ~30µs; real decode 4.8 ms — bandwidth-bound, not compute-bound.
+
+│  live ticker — 'stuck' from inside the die:
+│  the die produced ~18.5 GFLOP of flawless, useless math.
+│  nothing above the MMA knows it's wasted. nothing below knows there was a question.
+
+┌─ L9 · THE NUMBER — one weight, literally ─────────────────────────────────────────────────
+│  fp16 · zoom: 16 bits
+│  w = −0.5 → 1 01110 0000000000 = 0xB800 (sign · exp 2⁻¹ · mantissa 1.0)
+│  a multiply: XOR signs, add exponents, multiply mantissas — ~10,000
+│  transistors, one clock. read once per token, forever:
+│  read 0xB800. multiply. repeat.
+
+┌─ L10 · MEMORY HIERARCHY — the speed ladder the loop rides ────────────────────────────────
+│  register      ~0.5 ns HMMA fragments
+│  SMEM           ~15 ns GEMM tiles
+│  L2            ~200 ns die-wide 50 MB
+│  HBM3          ~350 ns the weights live HERE
+│  decode re-reads 14.9 GiB from HBM every token: 4.8 ms floor. the spiral costs watts because the loop
+│  never says 'enough'.
+
+┌─ L11 · DRAM CELL — the loop lives in leaky buckets of charge ─────────────────────────────
+│  ~338 billion capacitors
+│  cell = 1 transistor + 1 capacitor. charge leaks → refreshed ≥ every 64 ms:
+│  16×/second, whether anyone asked or not.
+│  210B capacitors hold the KV cache + 128B the weights —
+│  re-poured forever so the agent's circling never forgets itself.
+
+│  live: a few of the buckets, refreshing:
+│  15 refreshes of work that produced nothing.
+│  forgetting is expensive. the machine pays continuously so the loop never does.
+
+┌─ L12 · THE TRANSISTOR — 80 billion switches, one pattern ─────────────────────────────────
+│  clock 1.98 GHz · cycle ≈ 0.51 ns
+│  cycle = 0.51 ns — a signal crosses ~15 cm of wire per tick, one soda
+│  can. the whole GPU routes that step through 80B switches, 2e9×/second.
+│  the stuck loop at this level: same switch pattern, KV charge as the only
+│  'memory'. and it's just charge.
+
+│  live: a CMOS inverter switching — 'the agent thinking' at the metal:
+
+┌─ L13 · SILICON & ELECTRONS — the charge has no idea what it means ────────────────────────
+│  dope silicon: phosphorus → extra electrons (N), boron → holes (P). their
+│  junction + a gate field = the transistor. electrons drift at cm/s —
+│  slower than a garden snail. the speed is a stadium wave, not a sprint.
+│  in 1.0s, ~6.4e-06 field-pushes obeyed Maxwell,
+│  carrying 16-bit patterns that mean 'wait, let me reconsider'. physics complied.
+
+┌─ L14 · THE MACHINE'S BOTTOM — atoms. then fields. then nothing to stand on ───────────────
+│  atoms 0.543 nm apart, countable. gate oxide a few atoms thick — electrons
+│  tunnel whether invited or not. quantum leakage is a design constraint.
+│  deeper: electrons aren't balls, they're probability clouds. no 'thing' at
+│  all — only fields. the loop is not made of matter. matter is where the loop parks.
+│  the machine's floor: sand, lithographed, taught with charge. correctly.
+│  forever. that's the horror.
+
+┌─ L15 · THE NUCLEUS — the atom is almost entirely nothing ─────────────────────────────────
+│  atom 10⁻¹⁰ m · nucleus 10⁻¹⁴ m
+│  Rutherford 1909: alphas at gold foil. ~1 in 10,000 bounced back — all the
+│  mass sits in a speck 10,000× smaller than the atom. nucleus = marble,
+│  atom = the stadium. the 'solid' silicon was a force scaffold.
+
+│  live: alphas crossing the foil:
+│  240 through · 0 back — matter is 99.9999999% empty.
+
+┌─ L16 · QUARKS — confinement: a prison with no outside ────────────────────────────────────
+│  strong force grows with distance — the only one that does
+│  pull two quarks apart: the gluon field stretches into a flux tube, stores
+│  your energy, SNAPS — and condenses into a NEW quark pair.
+│  60+ years of attempts to isolate one: 0 successes. since the Big Bang.
+
+│  live: the extraction attempt:
+│  pairs created: 4 · quarks isolated: 0
+│  the universe's first stuck loop: quarks in confinement, 13.8 Gyr,
+│  no Ctrl+C. your agent's 90 seconds: rookie numbers.
+
+┌─ L17 · STANDARD MODEL — the whole machine runs on 3 particles + 2 forces ─────────────────
+│  17 particles: 12 fermions · 4 carriers · 1 Higgs
+│  QUARKS         u c t      d s b
+│  LEPTONS        e μ τ      νₑ ν_μ ν_τ
+│  CARRIERS       γ photon · g gluon · W · Z   (Higgs: gives mass)
+│  highlighted — up, down, electron, photon — run everything: you, the GPU,
+│  the question. gravity is 10³⁶× weaker: does nothing in the box; only
+│  wins at planet scale because it never cancels. the weakest force runs the
+│  biggest loop.
+
+┌─ L18 · QUANTUM FIELDS — there are no particles. there are ripples. ───────────────────────
+│  an electron isn't a thing in a wire — it's a quantized excitation of the
+│  electron field, a field present EVERYWHERE, always. same for every
+│  particle. 'stuff' is just where the ripples are dense. the Higgs
+│  field gives the ripple its mass — the electron's inertia is borrowed from
+│  a field that was already there. the machine runs on ripples.
+
+┌─ L19 · THE MEASUREMENT PROBLEM — the first floor with no bottom ──────────────────────────
+│  superposition verified · collapse verified · WHY: unknown since 1927
+│  |ψ⟩ = (|↑⟩+|↓⟩)/√2 — BOTH, provably. look → one outcome, cleanly. the math
+│  says nothing about when, why, or how. Copenhagen, Many-Worlds, pilot-wave
+│  — a century of the smartest loops has not terminated.
+
+│  live: superposition, then a measurement:
+│  the only spiral older than your agent's: 100 years, no exit.
+
+┌─ L20 · THE PLANCK WALL — where the word 'deeper' breaks ──────────────────────────────────
+│  planck length 1.6×10⁻³⁵ m · planck time 5.4×10⁻⁴⁴ s
+│  resolving anything smaller needs so much energy in so small a volume that
+│  it collapses into a black hole. resolution impossible — not hard, impossible.
+│  one GPU clock tick spans ~10³⁴ planck ticks. eternity is granular.
+
+│  live: the zoom counter, keyboard → wall:
+│  total zoom: ×10³³. physics verified at every stop — then the road ends,
+│  not with a thing, but with the end of the CONCEPT of size.
+
+┌─ L21 · THE EDGE — here be dragons ────────────────────────────────────────────────────────
+│  the honest inventory of what 'deeper' cannot currently answer
+│  ? quantum gravity
+│    no verified theory. strings: 10 extra dims, unproven. LQG: quantized space, unproven.
+│  ? vacuum catastrophe
+│    QFT predicts empty-space energy 10¹²⁰× observed — worst miss in physics. machine works anyway.
+│  ? dark sector
+│    ~95% of the universe (dark energy ~68% + dark matter ~27%) unmeasured. we are the minority.
+│  ? measurement problem
+│    L19. unsolved since 1927 — the longest-running spiral in science.
+│  ? holography / it-from-bit
+│    real math (AdS/CFT): a volume fully encoded on its boundary. proven in toy universes only.
+│  every previous level answered. this one refuses. the bottom of 'as deep as
+│  we can' is a boundary of knowledge, drawn in 10⁻³⁵ m ink.
+
+┌─ L22 · BELOW THE WALL — the map of the unverified ────────────────────────────────────────
+│  the last floor: not a place — a stack of hypotheses with no floor yet
+│  ∴ string theory
+│    everything = 1D filaments ~10⁻³⁵ m, modes = particles. needs 10 spatial dimensions. no unique experimental test to date. STATUS: UNVERIFIED.
+│  ∴ loop quantum gravity
+│    space and time themselves quantized; smallest volume ~4×10⁻¹⁰⁵ m³. no confirmed prediction. STATUS: UNVERIFIED.
+│  ∴ causal set theory
+│    spacetime grows from a discrete partial order of events — 'before' is the only primitive. STATUS: UNVERIFIED.
+│  ∴ the holographic principle
+│    3D reality fully encoded on a 2D boundary. exact for some toy universes (AdS/CFT); ours: UNKNOWN.
+
+│  this is maximum depth. not because we stopped digging — because the
+│  shovel is made of the thing we're digging in. below the wall there is no
+│  'below'. there are proposals, beautifully drawn, none with a floor of their own.
+│  deepest we can go = a well-posed map of what we cannot reach.
+
+  ════════════════════════════════════════════════════════════════════════════
+  FINAL REPORT — THE COMPLETE DESCENT · L0 → L22 · MAXIMUM DEPTH REACHED
+  ════════════════════════════════════════════════════════════════════════════
+
+  runtime             : 0:00:11
+  tokens generated    : 178 (answer produced: NO) · switch-cycles: 80
+  zoom                : ×10³³ — from keycap to the planck wall
+
+  the ladder:
+    L0   10² m    wire              request crosses the internet
+    L1   —        tokenizer         text becomes token IDs
+    L2   10⁻¹ m   gpu               weights + KV cache resident in VRAM
+    L3   —        forward pass      qkv · attn · mlp · logits
+    L4   —        decode loop       autoregression with no exit condition
+    L5   10² m    wire back         SSE holds; client waits forever
+    L6   —        orchestrator      scheduler calls generate() endlessly
+    L7   10⁻² m   cuda kernel       nested for-loops, no sentinel
+    L8   10⁻³ m   tensor core       MMAs recompute the same distribution
+    L9   —        fp16 number       read 0xB800. multiply. repeat.
+    L10  —        memory hierarchy  14.9 GiB re-read per token
+    L11  10⁻⁷ m   dram cell         340B capacitors re-poured 16×/s
+    L12  10⁻⁸ m   transistor        80B switches, one pattern
+    L13  10⁻¹⁰ m  electrons         drift slower than a snail; stadium wave
+    L14  10⁻¹⁰ m  atoms/lattice     machine bottom: sand + lithography
+    L15  10⁻¹⁴ m  nucleus           marble in a stadium; matter is a rumor
+    L16  10⁻¹⁸ m  quarks            confinement — the first stuck loop
+    L17  —        standard model    3 particles + 2 forces run everything
+    L18  —        quantum fields    particles = ripples in universal fields
+    L19  —        measurement       collapse with no mechanism — since 1927
+    L20  10⁻³⁵ m  planck wall       'smaller' stops being a thing
+    L21  —        the edge          honest unknowns: gravity, vacuum, dark sector
+    L22  —        below the wall    hypotheses with no floor yet
+
+  the fractal: same circle at every scale — request · for-loop ·
+  MMA · capacitor · switch · quark orbit · measurement debate. structure without
+  substance, circling. the spiral isn't a bug in the machine — it's a legal
+  state of matter.
+
+  GUARD MAP — where the spiral could have been broken:
+    L0/L5 client+gateway  
+      fail : stream held open forever by heartbeats
+      guard: hard total-duration timeout on the client AND gateway
+      armed: NO
+    L4 scheduler          
+      fail : max_tokens=null — no ceiling exists
+      guard: always set max_tokens / deadline / wall-clock budget
+      armed: NO
+    L4 sampler            
+      fail : rep_penalty=1.0, eos≈0 — circling is free
+      guard: repetition penalty >1.0, n-gram blocklist, stop strings
+      armed: OFF by default
+    L4 decode loop        
+      fail : no progress check between iterations
+      guard: loop detector: logits entropy / n-gram repetition monitor
+      armed: NO
+    L2 KV cache           
+      fail : monotonic growth, never compacted
+      guard: summarization/compaction at context thresholds
+      armed: rarely
+    L8 hardware           
+      fail : 97% util doing useless math — no waste signal
+      guard: waste alarm: work done vs. output delivered
+      armed: NO
+    billing               
+      fail : per-token meter runs perfectly during the spiral
+      guard: budget cutoff that halts generation
+      armed: available, often unset
+    the human             
+      fail : watches a spinner
+      guard: Ctrl+C
+      armed: YES — 4/4. the only control that worked.
+
+  bottom line for security engineering:
+    every automated layer was present and healthy. zero automated guards
+    fired. the spiral lived in the gap between 'nothing failed' and
+    'nobody stopped it.' instrument the meaning layers (L0–L6): timeouts,
+    ceilings, loop detectors, budgets. below that: physics. physics is fine.
+
+  the question outlasted HTTP, CUDA, silicon, atoms, nuclei, quarks,
+  fields, and the planck wall. the loop was never in the machine.
+  the machine was a place the loop briefly stopped.
+  watchdog inventory: automated 0 · human (Thor, Ctrl+C) 4/4.
+
+================================================================
+SUMMARY (JSON)
+{
+  "simulation": "the-spiral v1.0 \u2014 complete descent L0\u2192L22",
+  "question": "why did production go down last night?",
+  "ladder_levels": 23,
+  "depth_map": {
+    "L0": {
+      "name": "wire",
+      "scale": "10\u00b2 m",
+      "what": "request crosses the internet"
+    },
+    "L1": {
+      "name": "tokenizer",
+      "scale": "\u2014",
+      "what": "text becomes token IDs"
+    },
+    "L2": {
+      "name": "gpu",
+      "scale": "10\u207b\u00b9 m",
+      "what": "weights + KV cache resident in VRAM"
+    },
+    "L3": {
+      "name": "forward pass",
+      "scale": "\u2014",
+      "what": "qkv \u00b7 attn \u00b7 mlp \u00b7 logits"
+    },
+    "L4": {
+      "name": "decode loop",
+      "scale": "\u2014",
+      "what": "autoregression with no exit condition"
+    },
+    "L5": {
+      "name": "wire back",
+      "scale": "10\u00b2 m",
+      "what": "SSE holds; client waits forever"
+    },
+    "L6": {
+      "name": "orchestrator",
+      "scale": "\u2014",
+      "what": "scheduler calls generate() endlessly"
+    },
+    "L7": {
+      "name": "cuda kernel",
+      "scale": "10\u207b\u00b2 m",
+      "what": "nested for-loops, no sentinel"
+    },
+    "L8": {
+      "name": "tensor core",
+      "scale": "10\u207b\u00b3 m",
+      "what": "MMAs recompute the same distribution"
+    },
+    "L9": {
+      "name": "fp16 number",
+      "scale": "\u2014",
+      "what": "read 0xB800. multiply. repeat."
+    },
+    "L10": {
+      "name": "memory hierarchy",
+      "scale": "\u2014",
+      "what": "14.9 GiB re-read per token"
+    },
+    "L11": {
+      "name": "dram cell",
+      "scale": "10\u207b\u2077 m",
+      "what": "340B capacitors re-poured 16\u00d7/s"
+    },
+    "L12": {
+      "name": "transistor",
+      "scale": "10\u207b\u2078 m",
+      "what": "80B switches, one pattern"
+    },
+    "L13": {
+      "name": "electrons",
+      "scale": "10\u207b\u00b9\u2070 m",
+      "what": "drift slower than a snail; stadium wave"
+    },
+    "L14": {
+      "name": "atoms/lattice",
+      "scale": "10\u207b\u00b9\u2070 m",
+      "what": "machine bottom: sand + lithography"
+    },
+    "L15": {
+      "name": "nucleus",
+      "scale": "10\u207b\u00b9\u2074 m",
+      "what": "marble in a stadium; matter is a rumor"
+    },
+    "L16": {
+      "name": "quarks",
+      "scale": "10\u207b\u00b9\u2078 m",
+      "what": "confinement \u2014 the first stuck loop"
+    },
+    "L17": {
+      "name": "standard model",
+      "scale": "\u2014",
+      "what": "3 particles + 2 forces run everything"
+    },
+    "L18": {
+      "name": "quantum fields",
+      "scale": "\u2014",
+      "what": "particles = ripples in universal fields"
+    },
+    "L19": {
+      "name": "measurement",
+      "scale": "\u2014",
+      "what": "collapse with no mechanism \u2014 since 1927"
+    },
+    "L20": {
+      "name": "planck wall",
+      "scale": "10\u207b\u00b3\u2075 m",
+      "what": "'smaller' stops being a thing"
+    },
+    "L21": {
+      "name": "the edge",
+      "scale": "\u2014",
+      "what": "honest unknowns: gravity, vacuum, dark sector"
+    },
+    "L22": {
+      "name": "below the wall",
+      "scale": "\u2014",
+      "what": "hypotheses with no floor yet"
+    }
+  },
+  "tokens_generated": 178,
+  "answer_produced": false,
+  "switch_cycles": 80,
+  "total_zoom": "1e33 (keycap to planck)",
+  "guard_map": [
+    {
+      "layer": "L0/L5 client+gateway",
+      "failure": "stream held open forever by heartbeats",
+      "guard": "hard total-duration timeout on the client AND gateway",
+      "armed": "NO"
+    },
+    {
+      "layer": "L4 scheduler",
+      "failure": "max_tokens=null \u2014 no ceiling exists",
+      "guard": "always set max_tokens / deadline / wall-clock budget",
+      "armed": "NO"
+    },
+    {
+      "layer": "L4 sampler",
+      "failure": "rep_penalty=1.0, eos\u22480 \u2014 circling is free",
+      "guard": "repetition penalty >1.0, n-gram blocklist, stop strings",
+      "armed": "OFF by default"
+    },
+    {
+      "layer": "L4 decode loop",
+      "failure": "no progress check between iterations",
+      "guard": "loop detector: logits entropy / n-gram repetition monitor",
+      "armed": "NO"
+    },
+    {
+      "layer": "L2 KV cache",
+      "failure": "monotonic growth, never compacted",
+      "guard": "summarization/compaction at context thresholds",
+      "armed": "rarely"
+    },
+    {
+      "layer": "L8 hardware",
+      "failure": "97% util doing useless math \u2014 no waste signal",
+      "guard": "waste alarm: work done vs. output delivered",
+      "armed": "NO"
+    },
+    {
+      "layer": "billing",
+      "failure": "per-token meter runs perfectly during the spiral",
+      "guard": "budget cutoff that halts generation",
+      "armed": "available, often unset"
+    },
+    {
+      "layer": "the human",
+      "failure": "watches a spinner",
+      "guard": "Ctrl+C",
+      "armed": "YES \u2014 4/4. the only control that worked."
+    }
+  ],
+  "guards_armed": 0,
+  "guards_that_worked": [
+    "human: Ctrl+C 4/4"
+  ],
+  "finding": "the spiral is fractal and a legal state of matter; it can only be broken at meaning layers L0\u2013L6; zero automated guards fired in field sessions",
+  "deepest_verified_m": 1e-18,
+  "planck_wall_m": 1.6e-35,
+  "below_the_wall": [
+    "string theory (unverified)",
+    "loop quantum gravity (unverified)",
+    "causal sets (unverified)",
+    "holography (toy universes only)"
+  ]
+}
