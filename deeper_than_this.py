@@ -159,7 +159,7 @@ def l8_tensor_core(args):
     say(f"  all {SMS} SMs together: ~{SMS * MMA_FLOP * FREQ / 1e15:.2f} PFLOP/s at peak.")
     pause(args, 0.4)
     say(f"one token needs 16 GFLOP ÷ {MMA_FLOP} = {16e9 / MMA_FLOP:,.0f} MMAs. "
-        f"pure math: ~30µs. actual decode: ~{TOK_MEM_MS:.1f} ms.")
+        f"pure math: ~15µs. actual decode: ~{TOK_MEM_MS:.1f} ms.")
     say(f"  {col.RED}the GPU is not slow at thinking. it's a memory problem.{col.END} "
         f"(next levels.)")
     emit()
@@ -401,7 +401,8 @@ def descent_report(args, st):
     emit()
 
     summary = {
-        "simulation": "deeper-than-this v1.0",
+        "simulation": "deeper-than-this v1.1.1",
+        "stopped_by": st["stopped"],
         "levels": ["orchestrator", "cuda_kernel", "tensor_core", "fp16_number",
                    "memory_hierarchy", "dram_cell", "transistor", "silicon_electrons", "bottom_fields"],
         "clock_loop_cycles": st["cycles"],
@@ -413,7 +414,7 @@ def descent_report(args, st):
         "flop_per_mma": MMA_FLOP,
         "ms_per_token_floor": round(TOK_MEM_MS, 1),
         "finding": "the loop is fractal; only meaning-layer (<=L6) can break it",
-        "watchdog_inventory": {"automated": 0, "human_thor_ctrl_c": 4},
+        "watchdog_inventory": {"automated": 0, "human_operator_ctrl_c": 4},
     }
     try:
         with open(args.trace, "w", encoding="utf-8") as f:
@@ -425,6 +426,7 @@ def descent_report(args, st):
         emit(f"  {col.GREEN}✔ trace written to {args.trace}{col.END}")
     except OSError as e:
         emit(f"  {col.RED}✖ trace write failed: {e}{col.END}")
+        sys.exit(1)
     emit(f"  {col.DIM}hand it to another agent: 'find the issues in this process.'{col.END}")
     print()
 
@@ -440,18 +442,22 @@ def main():
     args.speedup = 4.0 if args.fast else 1.0
 
     print()
-    emit(f"{col.BOLD}  🔻 DEEPER THAN THIS {col.DIM}v1.0 — stack_spiral ended at the GPU. that was the foyer.{col.END}")
+    emit(f"{col.BOLD}  🔻 DEEPER THAN THIS {col.DIM}v1.1.1 — stack_spiral ended at the GPU. that was the foyer.{col.END}")
     emit(f"  {col.DIM}same question riding all the way down: \"why did production go down?\"{col.END}")
 
-    l6_orchestrator(args)
-    l7_cuda(args)
-    l8_tensor_core(args)
-    l9_number(args)
-    l10_hierarchy(args)
-    l11_dram(args)
-    st = l12_transistor(args)
-    l13_electrons(args, st)
-    l14_bottom(args)
+    st = dict(cycles=0, secs=0.0, stopped="operator interrupt (Ctrl+C)")
+    try:
+        l6_orchestrator(args)
+        l7_cuda(args)
+        l8_tensor_core(args)
+        l9_number(args)
+        l10_hierarchy(args)
+        l11_dram(args)
+        st = l12_transistor(args)
+        l13_electrons(args, st)
+        l14_bottom(args)
+    except KeyboardInterrupt:
+        pass  # any Ctrl+C before the final loop still gets the descent report
     descent_report(args, st)
 
 

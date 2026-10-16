@@ -209,10 +209,12 @@ def l4_spiral(args, prompt_ids):
                 emit(f"│     eos p ≈ 0.0003 {col.DIM}(never rises){col.END} · 4-gram peak "
                      f"\"{''.join(ng[0])}\" ×{ng[1]} {col.RED}→ penalty=1.0{col.END}")
                 emit(f"│     GPU util 97% {col.DIM}(working perfectly){col.END} · "
-                     f"energy {0.7 * secs:.2f} Wh · bill ${2 / 3600 * secs:.4f}")
+                     f"energy {0.7 * secs / 3.6:.2f} Wh · bill ${2 / 3600 * secs:.4f}")
             pause(args, 1.0 / tok_speed * 4.2)
     except KeyboardInterrupt:
-        pass
+        RUN["l4"] = dict(stopped="operator interrupt (Ctrl+C)", generated=generated,
+                         ctx=ctx, flops=flops_total, secs=time.time() - t0)
+        raise
     finally:
         sys.stdout.write("\033[?25h")
         sys.stdout.flush()
@@ -258,7 +260,7 @@ def l8_tensor_core(args):
     header("L8 · TENSOR CORE — 2 billion ticks/second of pure obedience",
            f"{SMS} SMs · HMMA.m16n8k16 = {MMA_FLOP:,} FLOP/issue")
     pause(args, 0.4)
-    say(f"one token = {16e9 / MMA_FLOP:,.0f} MMAs. pure math ~30µs; real decode "
+    say(f"one token = {16e9 / MMA_FLOP:,.0f} MMAs. pure math ~15µs; real decode "
         f"{col.RED}{TOK_MEM_MS:.1f} ms{col.END} — bandwidth-bound, not compute-bound.")
     emit()
     say(f"{col.DIM}live ticker — 'stuck' from inside the die:{col.END}")
@@ -356,7 +358,9 @@ def l12_transistor(args):
             sys.stdout.flush()
             pause(args, 0.05)
     except KeyboardInterrupt:
-        pass
+        RUN["l12"] = dict(cycles=cycles, secs=time.time() - t0,
+                          stopped="operator interrupt (Ctrl+C)")
+        raise
     finally:
         sys.stdout.write("\033[?25h")
         sys.stdout.flush()
@@ -666,12 +670,17 @@ def final_report(args, st4, st12):
     emit(f"  {col.DIM}the question outlasted HTTP, CUDA, silicon, atoms, nuclei, quarks,")
     emit(f"  fields, and the planck wall. the loop was never in the machine.")
     emit(f"  the machine was a place the loop briefly stopped.{col.END}")
-    emit(f"  watchdog inventory: automated 0 · human (Thor, Ctrl+C) 4/4.{col.END}")
+    emit(f"  watchdog inventory: automated 0 · human (operator, Ctrl+C) 4/4.{col.END}")
     emit()
 
+    stopped_by = ("operator interrupt (Ctrl+C)" if RUN.get("interrupted")
+                  else next((s["stopped"] for s in (st4, st12)
+                             if not s["stopped"].startswith("skipped")),
+                            "completed full descent"))
     summary = {
-        "simulation": "the-spiral v1.0 — complete descent L0→L22",
+        "simulation": "the-spiral v1.1.1 — complete descent L0→L22",
         "question": args.question,
+        "stopped_by": stopped_by,
         "ladder_levels": len(LADDER),
         "depth_map": {lvl: {"name": n, "scale": s, "what": d} for lvl, n, s, d in LADDER},
         "tokens_generated": st4["generated"],
@@ -698,6 +707,7 @@ def final_report(args, st4, st12):
         emit(f"  {col.GREEN}✔ trace written to {args.trace}{col.END}")
     except OSError as e:
         emit(f"  {col.RED}✖ trace write failed: {e}{col.END}")
+        sys.exit(1)
     emit(f"  {col.DIM}handoff: give the trace to another agent — 'find the issues in this process.'{col.END}")
     print()
 
@@ -740,26 +750,32 @@ def main():
             sys.exit(2)
 
     print()
-    emit(f"{col.BOLD}  🌀 THE SPIRAL {col.DIM}v1.0 — the complete descent · L0 → L22 · maximum depth{col.END}")
+    emit(f"{col.BOLD}  🌀 THE SPIRAL {col.DIM}v1.1.1 — the complete descent · L0 → L22 · maximum depth{col.END}")
     emit(f"  question: {col.CYAN}\"{args.question}\"{col.END}  "
          f"{col.DIM}(Ctrl+C any time → final report){col.END}")
 
     st4 = dict(generated=0, ctx=0, flops=0.0, secs=0.0, stopped="skipped (--from)")
     st12 = dict(cycles=0, secs=0.0, stopped="skipped (--from)")
     prompt_ids = [1, 2, 3]  # default if --from skips the tokenizer
-    for name, fn in order[start_idx:]:
-        if name == "L1":
-            prompt_ids = fn(args)
-        elif name == "L4":
-            st4 = fn(args, prompt_ids)
-        elif name == "L5":
-            st4 = fn(args, st4)
-        elif name == "L12":
-            st12 = fn(args)
-        elif name == "L13":
-            fn(args, st12)
-        else:
-            fn(args)
+    try:
+        for name, fn in order[start_idx:]:
+            if name == "L1":
+                prompt_ids = fn(args)
+            elif name == "L4":
+                st4 = fn(args, prompt_ids)
+            elif name == "L5":
+                st4 = fn(args, st4)
+            elif name == "L12":
+                st12 = fn(args)
+            elif name == "L13":
+                fn(args, st12)
+            else:
+                fn(args)
+    except KeyboardInterrupt:
+        # any Ctrl+C anywhere in the descent goes straight to the final report
+        RUN["interrupted"] = True
+        st4 = RUN.get("l4", st4)
+        st12 = RUN.get("l12", st12)
 
     final_report(args, st4, st12)
 

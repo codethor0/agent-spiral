@@ -23,6 +23,7 @@ Stdlib only. No dependencies. Python 3.8+.
 """
 
 import argparse
+import itertools
 import json
 import random
 import re
@@ -119,7 +120,7 @@ def run(args):
 
     # ---- boot sequence -----------------------------------------------------
     print()
-    print(f"{col.BOLD}  🧠 stuck-agent simulation {col.DIM}v1.0{col.END}")
+    print(f"{col.BOLD}  🧠 stuck-agent simulation {col.DIM}v1.1.1{col.END}")
     print(f"  question: {col.CYAN}\"{args.question}\"{col.END}")
     print()
     for line in BOOT:
@@ -143,7 +144,7 @@ def run(args):
         "t0": time.time(),
         "stopped": "operator interrupt (Ctrl+C)",
     }
-    spin = iter(SPINNER * 10_000_000)  # effectively infinite
+    spin = itertools.cycle(SPINNER)  # infinite spinner, constant memory
     next_beat = 10
     deadline = time.time() + args.seconds if args.seconds else None
 
@@ -240,7 +241,7 @@ def postmortem(state, args, trace_lines, emit):
 
     # ---- trace file ---------------------------------------------------------
     summary = {
-        "simulation": "stuck-agent v1.0",
+        "simulation": "stuck-agent v1.1.1",
         "question": args.question,
         "stopped_by": state["stopped"],
         "seconds": round(elapsed, 1),
@@ -266,6 +267,7 @@ def postmortem(state, args, trace_lines, emit):
         emit(f"  {col.GREEN}✔ trace written to {args.trace}{col.END}")
     except OSError as e:
         emit(f"  {col.RED}✖ could not write trace: {e}{col.END}")
+        sys.exit(1)
     emit()
     emit(f"  {col.DIM}next step: hand the trace file to another agent and ask it to")
     emit(f"  find the issues in this process.{col.END}")

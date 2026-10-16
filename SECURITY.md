@@ -22,3 +22,8 @@ These programs are terminal simulations. They make no network connections,
 read no files other than their own trace output, take no credentials, and
 have no third-party dependencies. Their only writes are the trace log files
 they are explicitly asked to produce.
+
+One exception: `tools/render_demo.py`, the demo toolchain. It reads
+`tools/demo.cast` (a recorded terminal session shipped with the repo) and
+writes `docs/demo.gif`. It is not part of the simulations and never runs
+unless invoked directly.

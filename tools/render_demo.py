@@ -13,6 +13,7 @@ Dependency: Pillow (only this tool, not the simulations).
 """
 
 import json
+import os
 import sys
 
 from PIL import Image, ImageDraw, ImageFont
@@ -182,10 +183,27 @@ def render(frames, out_path, font_path, cell_w=9, cell_h=18, font_px=14):
           f"{sum(durations) / 1000:.1f}s, {img_w}x{img_h}")
 
 
+FONT_CANDIDATES = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",  # linux
+    "/usr/share/fonts/dejavu/DejaVuSansMono.ttf",           # linux (alt path)
+    "/Library/Fonts/Menlo.ttc",                             # macos
+    "/System/Library/Fonts/Menlo.ttc",                      # macos (system)
+    "C:\\Windows\\Fonts\\consola.ttf",                      # windows
+    "C:\\Windows\\Fonts\\cour.ttf",                         # windows (fallback)
+]
+
+
+def default_font():
+    for path in FONT_CANDIDATES:
+        if os.path.exists(path):
+            return path
+    sys.exit("no monospace font found; pass one explicitly: "
+             "render_demo.py cast out.gif /path/to/font.ttf")
+
+
 def main():
     cast_path, out_path = sys.argv[1], sys.argv[2]
-    font_path = sys.argv[3] if len(sys.argv) > 3 else \
-        "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
+    font_path = sys.argv[3] if len(sys.argv) > 3 else default_font()
     lines = open(cast_path, encoding="utf-8").read().splitlines()
     hdr = json.loads(lines[0])
     term = Term(hdr["width"], hdr["height"])

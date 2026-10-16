@@ -372,7 +372,7 @@ def l21_edge(args):
 # ────────────────────────────────────────────────────────────────────────────
 # Final report
 # ────────────────────────────────────────────────────────────────────────────
-def final_report(args):
+def final_report(args, stopped_by="completed full descent"):
     emit()
     line = "═" * min(74, W - 4)
     emit(f"{col.BOLD}{col.RED}  {line}")
@@ -402,11 +402,12 @@ def final_report(args):
     emit(f"  quarks, fields, and the planck wall. the loop was never in the machine.")
     emit(f"  the machine was a place the loop briefly stopped.{col.END}")
     emit()
-    emit(f"  {col.DIM}watchdog inventory, final: automated 0 · human (Thor, Ctrl+C) 4/4.{col.END}")
+    emit(f"  {col.DIM}watchdog inventory, final: automated 0 · human (operator, Ctrl+C) 4/4.{col.END}")
     emit()
 
     summary = {
-        "simulation": "deepest v1.0",
+        "simulation": "deepest v1.1.1",
+        "stopped_by": stopped_by,
         "levels": ["nucleus", "quarks_confinement", "standard_model", "quantum_fields",
                    "measurement_problem", "planck_wall", "edge_unknowns"],
         "deepest_verified_m": 1e-18,
@@ -418,7 +419,7 @@ def final_report(args):
         "vacuum_catastrophe_mismatch": "1e120",
         "dark_sector_fraction": 0.95,
         "finding": "'deeper' ends at the planck wall; below it there is no 'smaller' — the bottom is an unknown, not a thing",
-        "watchdog_inventory": {"automated": 0, "human_thor_ctrl_c": 4},
+        "watchdog_inventory": {"automated": 0, "human_operator_ctrl_c": 4},
     }
     try:
         with open(args.trace, "w", encoding="utf-8") as f:
@@ -430,6 +431,7 @@ def final_report(args):
         emit(f"  {col.GREEN}✔ trace written to {args.trace}{col.END}")
     except OSError as e:
         emit(f"  {col.RED}✖ trace write failed: {e}{col.END}")
+        sys.exit(1)
     emit(f"  {col.DIM}hand it to another agent: 'find the issues in this process.'{col.END}")
     print()
 
@@ -443,17 +445,21 @@ def main():
     args.speedup = 4.0 if args.fast else 1.0
 
     print()
-    emit(f"{col.BOLD}  🕳 DEEPEST {col.DIM}v1.0 — you asked 'can we go deeper than this?'")
+    emit(f"{col.BOLD}  🕳 DEEPEST {col.DIM}v1.1.1 — you asked 'can we go deeper than this?'")
     emit(f"  L14 said 'fields, then nobody knows.' let's find out where nobody knows ends.{col.END}")
 
-    l15_nucleus(args)
-    l16_quarks(args)
-    l17_standard_model(args)
-    l18_fields(args)
-    l19_measurement(args)
-    l20_planck(args)
-    l21_edge(args)
-    final_report(args)
+    stopped_by = "completed full descent"
+    try:
+        l15_nucleus(args)
+        l16_quarks(args)
+        l17_standard_model(args)
+        l18_fields(args)
+        l19_measurement(args)
+        l20_planck(args)
+        l21_edge(args)
+    except KeyboardInterrupt:
+        stopped_by = "operator interrupt (Ctrl+C)"
+    final_report(args, stopped_by)
 
 
 if __name__ == "__main__":

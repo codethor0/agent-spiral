@@ -24,10 +24,10 @@ this from the repo root and paste the results into the PR:
 python3 -m py_compile *.py tools/render_demo.py
 python3 stuck_agent.py --fast --seconds 1
 python3 agent_stack_spiral.py --fast --seconds 1
-python3 deeper_than_this.py --fast --seconds 1 --demo-seconds 1
+python3 deeper_than_this.py --fast --seconds 1
 python3 deepest.py --fast --demo-seconds 1
 python3 the_spiral.py --fast --live 1 --seconds 1
-python3 the_spiral.py --fast --live 1 --from L15
+python3 the_spiral.py --fast --live 1 --from L15 --seconds 1
 python3 - <<'EOF'
 import json
 s = open('the_spiral_trace.log').read()

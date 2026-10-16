@@ -334,7 +334,7 @@ def postmortem(args, st):
     emit(f"  {col.DIM}the spiral lives in the gap between 'no layer failed' and 'nobody stopped it'.{col.END}")
 
     summary = {
-        "simulation": "agent-stack-spiral v1.0",
+        "simulation": "agent-stack-spiral v1.1.1",
         "question": args.question,
         "stopped_by": st["stopped"],
         "seconds": round(st["secs"], 1),
@@ -357,6 +357,7 @@ def postmortem(args, st):
         emit(f"  {col.GREEN}✔ trace written to {args.trace}{col.END}")
     except OSError as e:
         emit(f"  {col.RED}✖ trace write failed: {e}{col.END}")
+        sys.exit(1)
     emit(f"  {col.DIM}hand the trace to another agent: 'find the issues in this process.'{col.END}")
     print()
 
@@ -371,15 +372,20 @@ def main():
     args.speedup = 4.0 if args.fast else 1.0
 
     print()
-    emit(f"{col.BOLD}  ⚡ AGENT STACK SPIRAL {col.DIM}v1.0 — descent into an agent that never comes back{col.END}")
+    emit(f"{col.BOLD}  ⚡ AGENT STACK SPIRAL {col.DIM}v1.1.1 — descent into an agent that never comes back{col.END}")
     emit(f"  question: {col.CYAN}\"{args.question}\"{col.END}")
 
-    layer_wire(args)
-    ids = layer_tokenizer(args)
-    layer_gpu(args)
-    layer_math(args)
-    st = layer_spiral(args, ids)
-    layer_wire_back(args, st)
+    st = dict(secs=0.0, generated=0, ctx=0, flops=0.0, energy_wh=0.0, cost=0.0,
+              rep=Counter(), stopped="operator interrupt (Ctrl+C)")
+    try:
+        layer_wire(args)
+        ids = layer_tokenizer(args)
+        layer_gpu(args)
+        layer_math(args)
+        st = layer_spiral(args, ids)
+        layer_wire_back(args, st)
+    except KeyboardInterrupt:
+        pass  # any Ctrl+C before the decode loop still gets the post-mortem
     postmortem(args, st)
 
 
