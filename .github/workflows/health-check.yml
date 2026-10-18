@@ -1,0 +1,49 @@
+name: ci-health
+
+# Daily health check for main: runs the full test suite and opens a single
+# tracking issue if it ever starts failing. Complements tests.yml (push/PR)
+# by catching environment rot (runner images, dependency drift) that no
+# commit triggered.
+
+on:
+  schedule:
+    - cron: '23 7 * * *' # daily 07:23 UTC / 00:23 PT
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Pillow (optional; exercises the renderer tests)
+        run: python -m pip install pillow
+      - name: Run simulation test suite (stdlib only)
+        run: python -m unittest discover -s tests -v
+      - name: Open issue on failure (one at a time)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          TITLE="CI health check failing on main"
+          if gh issue list --state open --search "$TITLE in:title" --json number --jq '.[0].number' | grep -q .; then
+            echo "An open health-check issue already exists; not creating a duplicate."
+            gh issue list --state open --search "$TITLE in:title" --json number,title,url \
+              --jq '.[0] | "Existing: #\(.number) \(.title) — \(.url)"'
+          else
+            gh issue create --title "$TITLE" --body "The daily CI health check just failed on \`main\`.
+
+            Run: $RUN_URL
+
+            Possible causes: runner-image changes, dependency drift, or a real regression that push-triggered CI missed (e.g. timing-sensitive tests).
+
+            Close this issue once the suite is green again; a new one will be opened if the failure recurs."
+          fi
