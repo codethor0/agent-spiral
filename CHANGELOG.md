@@ -18,9 +18,17 @@ expanded automated suite.
   presented as the limit of current theory ("with known physics",
   "shortest tick current physics can define"), not a measured limit of
   nature. README Accuracy section states where verified physics ends
-  (~10^-18 m) and theory begins.
+  (~10^-18 m) and theory begins. Follow-up: deepest.py L20 header and
+  final finding now say distance/duration stop being definable rather
+  than stop existing.
 - --seconds help text and README now state explicitly that it bounds only
   the L4/L12 live loops, not the whole descent.
+- Guard map: the human Ctrl+C entry now reads "YES — 4/4 in field
+  sessions; this run's control is reported in the summary", so history
+  cannot be confused with the current run's termination.
+- traces/sample-trace.log regenerated to match the current JSON schema
+  (demo_control_that_ended_this_run, field_session_record); a test now
+  fails if the sample trace drifts from the current format again.
 - Add 4 regression tests (suite grew to 51 after the round-5 renderer
   tests): endpoint frame on tiny windows, demo_control on timeout and
   Ctrl+C runs, no absolute Planck claims in source.
@@ -37,8 +45,9 @@ expanded automated suite.
   skip the animation; both levels now state the two reference frames
   explicitly (counter counts orders below 1 m; the keycap-to-wall trip is
   x10^33).
-- Add tests/test_render_demo.py (16 tests): renderer escape sequences,
-  OSC-BEL / OSC-ST termination, split sequences, deferred autowrap, CLI
+- Add tests/test_render_demo.py (18 tests): renderer escape sequences,
+  OSC-BEL / OSC-ST termination (including ST split across chunks and
+  ST-before-BEL precedence), split sequences, deferred autowrap, CLI
   validation. Skips without Pillow.
 - Add tests/test_numerics.py (11 tests): independent recomputation of the
   hardware model (KV bytes per token, weight GiB, KV pool, per-token

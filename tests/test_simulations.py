@@ -295,6 +295,24 @@ class TestKnownBugs(unittest.TestCase):
                 self.assertNotIn("not hard, impossible", src)
                 self.assertNotIn("physics verified at every stop", src)
                 self.assertNotIn("shortest meaningful tick", src)
+                self.assertNotIn("duration stop existing", src)
+
+    def test_sample_trace_matches_current_schema(self):
+        """The checked-in example trace must reflect the current report
+        format, not a historical one."""
+        trace = os.path.join(REPO_ROOT, "traces", "sample-trace.log")
+        d = extract_summary_json(trace)
+        self.assertIn("demo_control_that_ended_this_run", d)
+        self.assertIn("field_session_record", d)
+        self.assertNotIn("guards_that_worked", d)
+        self.assertNotIn("guards_armed", d)
+
+    def test_guard_map_labels_field_sessions(self):
+        """The guard map's human entry must label the 4/4 figure as field
+        session history, not as this run's termination control."""
+        src = open(os.path.join(REPO_ROOT, "the_spiral.py"), encoding="utf-8").read()
+        self.assertNotIn("the only control that worked", src)
+        self.assertIn("4/4 in field sessions", src)
 
 
 if __name__ == "__main__":

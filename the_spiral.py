@@ -655,7 +655,7 @@ GUARDS = [
     ("billing", "per-token meter runs perfectly during the spiral",
      "budget cutoff that halts generation", "available, often unset"),
     ("the human", "watches a spinner",
-     "Ctrl+C", "YES — 4/4. the only control that worked."),
+     "Ctrl+C", "YES — 4/4 in field sessions; this run's control is reported in the summary"),
 ]
 
 

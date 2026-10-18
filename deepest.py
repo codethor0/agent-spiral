@@ -292,7 +292,7 @@ def l19_measurement(args):
 # ────────────────────────────────────────────────────────────────────────────
 def l20_planck(args):
     header("L20 · THE PLANCK WALL — where the word 'deeper' breaks",
-           "planck length 1.6×10⁻³⁵ m · planck time 5.4×10⁻⁴⁴ s · below these: distance & duration stop existing")
+           "planck length 1.6×10⁻³⁵ m · planck time 5.4×10⁻⁴⁴ s · below these: distance & duration stop being definable")
     pause(args, 0.5)
     say("keep zooming: atom 10⁻¹⁰ → nucleus 10⁻¹⁴ → quark structure 10⁻¹⁸ → …")
     say("at 10⁻³⁵ m, the math itself fails: to resolve anything smaller you'd need")
@@ -427,7 +427,8 @@ def final_report(args, stopped_by="completed full descent"):
         "measurement_problem_open_years": 100,
         "vacuum_catastrophe_mismatch": "1e120",
         "dark_sector_fraction": 0.95,
-        "finding": "'deeper' ends at the planck wall; below it there is no 'smaller' — the bottom is an unknown, not a thing",
+        "finding": ("'deeper' ends at the planck wall as current physics can define it; "
+                    "below, 'smaller' stops being answerable — the bottom is an unknown, not a thing"),
         "field_session_record": {"automated_guards_fired": 0, "human_ctrl_c": "4/4"},
     }
     try:
