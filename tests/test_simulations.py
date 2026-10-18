@@ -87,7 +87,11 @@ class TestFastRuns(unittest.TestCase):
             d = extract_summary_json(trace)
             self.assertTrue(d["stopped_by"].startswith("timeout"))
             self.assertGreater(d["tokens_generated"], 0)
-            self.assertGreater(d["kv_cache_gib"], 0)
+            # kv_cache_gib must equal the recomputed value for the reported
+            # context size — machine-independent, unlike a >0 threshold that
+            # rounds to 0.00 when a slow CI runner generates few tokens
+            expected = round(d["final_context_tokens"] * 131072 / (1024 ** 3), 2)
+            self.assertAlmostEqual(d["kv_cache_gib"], expected)
 
     def test_deeper_seconds(self):
         with tempfile.TemporaryDirectory() as td:
@@ -291,7 +295,8 @@ class TestKnownBugs(unittest.TestCase):
         physics, not a measured limit of nature."""
         for script in ("the_spiral.py", "deepest.py"):
             with self.subTest(script=script):
-                src = open(os.path.join(REPO_ROOT, script), encoding="utf-8").read()
+                with open(os.path.join(REPO_ROOT, script), encoding="utf-8") as f:
+                    src = f.read()
                 self.assertNotIn("not hard, impossible", src)
                 self.assertNotIn("physics verified at every stop", src)
                 self.assertNotIn("shortest meaningful tick", src)
@@ -310,7 +315,8 @@ class TestKnownBugs(unittest.TestCase):
     def test_guard_map_labels_field_sessions(self):
         """The guard map's human entry must label the 4/4 figure as field
         session history, not as this run's termination control."""
-        src = open(os.path.join(REPO_ROOT, "the_spiral.py"), encoding="utf-8").read()
+        with open(os.path.join(REPO_ROOT, "the_spiral.py"), encoding="utf-8") as f:
+            src = f.read()
         self.assertNotIn("the only control that worked", src)
         self.assertIn("4/4 in field sessions", src)
 
