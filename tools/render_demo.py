@@ -142,20 +142,27 @@ class Term:
                 i = j + 1
                 continue
             if ch == "\x1b" and i + 1 < n and text[i + 1] == "]":
-                # OSC (title, etc.): skip to BEL or ST (ESC \)
-                j = text.find("\a", i + 2)
+                # OSC (title, etc.): terminated by BEL or ST (ESC \). Find
+                # the EARLIEST of the two so a later BEL can't swallow
+                # output that follows an ST in the same chunk.
+                bel = text.find("\a", i + 2)
+                esc = text.find("\x1b", i + 2)
+                j = bel if (esc < 0 or 0 <= bel < esc) else esc
                 if j < 0:
-                    j = text.find("\x1b", i + 2)
-                if j < 0:
+                    # unterminated: keep the WHOLE OSC (not just the tail)
+                    # so a terminator split across chunks is reassembled
                     self.pending = text[i:]
                     break
-                if text[j] == "\x1b":
-                    # ST is ESC + backslash: consume both. A different ESC
-                    # starts a new sequence: leave it for the main loop.
+                if j == esc:
                     if j + 1 < n and text[j + 1] == "\\":
-                        i = j + 2
-                    else:
-                        i = j
+                        i = j + 2  # ST: consume ESC and backslash
+                        continue
+                    if j + 1 >= n:
+                        # ESC is the last byte: it may be the first half of
+                        # an ST split across chunks — wait for more input
+                        self.pending = text[i:]
+                        break
+                    i = j  # a different sequence: reprocess from the ESC
                     continue
                 i = j + 1  # BEL
                 continue

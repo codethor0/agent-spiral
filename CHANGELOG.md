@@ -21,14 +21,17 @@ expanded automated suite.
   (~10^-18 m) and theory begins.
 - --seconds help text and README now state explicitly that it bounds only
   the L4/L12 live loops, not the whole descent.
-- Add 4 regression tests (49 total): endpoint frame on tiny windows,
-  demo_control on timeout and Ctrl+C runs, no absolute Planck claims in
-  source.
+- Add 4 regression tests (suite grew to 51 after the round-5 renderer
+  tests): endpoint frame on tiny windows, demo_control on timeout and
+  Ctrl+C runs, no absolute Planck claims in source.
 
 - Fix tools/render_demo.py: OSC sequences terminated by ST (ESC \) no
   longer leave a stray backslash on screen; missing/insufficient command
   line arguments now print a usage message and exit 2 instead of an
-  IndexError traceback.
+  IndexError traceback. Follow-up: an ST split across feed() chunks is
+  reassembled instead of leaking a stray backslash, and when a chunk
+  contains both an ST and a later BEL the earliest terminator wins (a
+  later BEL can no longer swallow output after the ST).
 - the_spiral.py and deepest.py L20: the zoom window now measures elapsed
   time with time.monotonic(), so wall-clock adjustments cannot stall or
   skip the animation; both levels now state the two reference frames
@@ -44,8 +47,10 @@ expanded automated suite.
 - Fix stale test-module documentation and give every interrupt test its
   own temporary directory (no shared fixed paths).
 - Add .github/workflows/tests.yml: runs the suite on Linux and macOS,
-  Python 3.9-3.13, on push and pull request.
-- Suite is now 45 tests; docs/demo.gif re-recorded after the L20 note.
+  Python 3.9-3.13, on push and pull request. CI installs Pillow so the
+  renderer tests execute instead of skipping; 3.8 added to the matrix to
+  match the advertised Python 3.8+ support.
+- Suite is now 51 tests; docs/demo.gif re-recorded after the L20 note.
 
 ## 1.1.4 - 2026-10-18
 

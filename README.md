@@ -59,13 +59,14 @@ Stdlib-only suite (no dependencies beyond Python itself):
 python3 -m unittest discover -s tests
 ```
 
-45 tests across three files cover compile sanity, bounded runs of all five
+51 tests across three files cover compile sanity, bounded runs of all five
 scripts, trace JSON validity, argument validation exit codes, broken-pipe
 and closed-stdout behavior, Ctrl+C reporting, independent recomputation of
 the hardware model constants, and terminal-renderer escape sequences. The
-renderer tests require Pillow and are skipped when it is not installed.
-Runtime is about a minute. CI runs the suite on Linux and macOS for every
-push and pull request.
+renderer tests require Pillow and are skipped when it is not installed;
+CI installs it, so every test executes in the matrix. Runtime is about a
+minute. CI runs the suite on Linux and macOS for every push and pull
+request.
 
 ## What a run produces
 

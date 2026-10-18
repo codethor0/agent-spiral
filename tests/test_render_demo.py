@@ -111,6 +111,21 @@ class TestTerm(unittest.TestCase):
         t.feed("dow\x1b\\Z")
         self.assertEqual(row_text(t).rstrip(), "Z")
 
+    def test_osc_st_split_across_feeds(self):
+        # regression: an ST (ESC \) split at the chunk boundary used to
+        # lose the OSC prefix and render the backslash as a stray character
+        t = self.make()
+        t.feed("\x1b]0;title\x1b")
+        t.feed("\\X")
+        self.assertEqual(row_text(t).rstrip(), "X")
+
+    def test_osc_st_before_bel_in_same_chunk(self):
+        # regression: BEL was searched before ST, so an ST followed by
+        # output and a later BEL swallowed everything up to the BEL
+        t = self.make()
+        t.feed("\x1b]0;t\x1b\\A\x1b]1;x\aB")
+        self.assertEqual(row_text(t).rstrip(), "AB")
+
     def test_osc_truncated_pending(self):
         t = self.make()
         t.feed("\x1b]0;abc")
