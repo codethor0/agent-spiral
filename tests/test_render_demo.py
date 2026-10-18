@@ -224,6 +224,70 @@ class TestRenderPipeline(unittest.TestCase):
                     self.assertIn("timestamp", p.stderr)
                     self.assertNotIn("Traceback", p.stderr)
 
+    def test_hostile_cast_headers_rejected(self):
+        # security audit round 7: dimensions are the renderer's main
+        # memory/CPU amplifier — a 44-byte cast claiming 100000x100000
+        # cells never finished pre-fix. Zero/negative/fractional/string/
+        # bool/oversized dimensions must be a clean error, never a
+        # traceback or a runaway allocation.
+        headers = [
+            {"version": 2, "width": 0, "height": 0},
+            {"version": 2, "width": -5, "height": -3},
+            {"version": 2, "width": 40.9, "height": 10.1},
+            {"version": 2, "width": "40", "height": "10"},
+            {"version": 2, "width": True, "height": True},
+            {"version": 2, "width": 100000, "height": 100000},
+            {"version": 2, "width": 1000, "height": 101},  # 101_000 cells > cap
+        ]
+        for hdr in headers:
+            with self.subTest(header=hdr):
+                with tempfile.TemporaryDirectory() as td:
+                    bad = os.path.join(td, "bad.cast")
+                    with open(bad, "w", encoding="utf-8") as f:
+                        f.write(json.dumps(hdr) + "\n")
+                        f.write('[0.1, "o", "x"]\n')
+                    p = subprocess.run(
+                        [sys.executable, os.path.join(REPO_ROOT, "tools", "render_demo.py"),
+                         bad, os.path.join(td, "o.gif")],
+                        capture_output=True, text=True, timeout=30)
+                    self.assertEqual(p.returncode, 1, p.stderr)
+                    self.assertIn("malformed cast header", p.stderr)
+                    self.assertNotIn("Traceback", p.stderr)
+
+    def test_non_string_event_data_rejected(self):
+        # security audit round 7: non-string event data crashed feed() with
+        # a TypeError traceback; it must be a clean error.
+        for line in ('[0.1, "o", 123]', '[0.1, "o", null]', '[0.1, "o", [1, 2]]'):
+            with self.subTest(line=line):
+                with tempfile.TemporaryDirectory() as td:
+                    bad = os.path.join(td, "bad.cast")
+                    with open(bad, "w", encoding="utf-8") as f:
+                        f.write('{"version": 2, "width": 40, "height": 10}\n')
+                        f.write(line + "\n")
+                    p = subprocess.run(
+                        [sys.executable, os.path.join(REPO_ROOT, "tools", "render_demo.py"),
+                         bad, os.path.join(td, "o.gif")],
+                        capture_output=True, text=True)
+                    self.assertEqual(p.returncode, 1, p.stderr)
+                    self.assertIn("malformed event data", p.stderr)
+                    self.assertNotIn("Traceback", p.stderr)
+
+    def test_huge_final_gap_still_renders(self):
+        # security audit round 7: pathological (but finite) gaps must clamp
+        # to the GIF 16-bit delay range, not crash int()/Pillow.
+        with tempfile.TemporaryDirectory() as td:
+            cast = os.path.join(td, "gap.cast")
+            with open(cast, "w", encoding="utf-8") as f:
+                f.write('{"version": 2, "width": 40, "height": 10}\n')
+                f.write('[0.0, "o", "first"]\n[1e15, "o", "last"]\n')
+            out = os.path.join(td, "o.gif")
+            p = subprocess.run(
+                [sys.executable, os.path.join(REPO_ROOT, "tools", "render_demo.py"),
+                 cast, out],
+                capture_output=True, text=True)
+            self.assertEqual(p.returncode, 0, p.stderr)
+            self.assertTrue(os.path.getsize(out) > 0)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

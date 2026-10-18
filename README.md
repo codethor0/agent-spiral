@@ -1,7 +1,7 @@
 # agent-spiral
 
 ![license](https://img.shields.io/badge/license-MIT-green)
-![python](https://img.shields.io/badge/python-3.8%2B-blue)
+![python](https://img.shields.io/badge/python-3.11%2B-blue)
 ![deps](https://img.shields.io/badge/dependencies-none-brightgreen)
 ![platform](https://img.shields.io/badge/platform-linux%20%7C%20macos-lightgrey)
 ![tests](https://github.com/codethor0/agent-spiral/actions/workflows/tests.yml/badge.svg)
@@ -44,7 +44,8 @@ python3 stuck_agent.py -q "your question"
 `--seconds N` is not a whole-program deadline: it bounds only the two live
 loops (L4 decode, L12 clock). The remaining levels still run to completion.
 
-No dependencies. Standard library only. Python 3.8+.
+No dependencies. Standard library only. Python 3.11+ (3.8–3.10 are end of
+life and no longer receive security fixes; see CHANGELOG).
 
 ## Demo
 

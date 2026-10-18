@@ -38,6 +38,7 @@ import shutil
 import signal
 import sys
 import time
+import unicodedata
 from collections import Counter, deque
 from datetime import timedelta
 
@@ -75,8 +76,6 @@ def _terminate(signum, _frame):
     # SIGTERM/SIGHUP (unlike Ctrl+C) have no report path: mark the spooled
     # trace as interrupted so a partial handoff can never be mistaken for
     # a complete one, then die with the conventional 128+signal code.
-    # Registered at import time so there is no window before main() where
-    # a signal would kill the process and leave an unmarked partial trace.
     # The marker goes out via os.write (unbuffered, fd-level): a buffered
     # write here can be lost if the interrupted frame was itself inside a
     # buffered write/flush on the same file object.
@@ -94,14 +93,15 @@ def _terminate(signum, _frame):
     sys.exit(128 + signum)
 
 
-signal.signal(signal.SIGTERM, _terminate)
-signal.signal(signal.SIGHUP, _terminate)
-
-
 def safe_text(s):
-    # neutralize control characters so question text can never emit terminal
-    # escapes or break trace layout; printable text (incl. unicode) is kept
-    return "".join(ch if 32 <= ord(ch) != 127 else f"\\x{ord(ch):02x}" for ch in s)
+    # Neutralize every Unicode control character — C0, C1, format chars
+    # (bidi overrides like U+202E, zero-width spaces), surrogates, private
+    # use — so question text can never emit terminal escapes, reorder or
+    # visually spoof displayed text, or break trace layout. Letters and
+    # punctuation from all real scripts (Arabic, Hebrew, CJK, …) are kept;
+    # only category-C code points are escaped.
+    return "".join(ch if not unicodedata.category(ch).startswith("C")
+                   else f"\\u{ord(ch):04x}" for ch in s)
 
 
 def emit(s=""):
@@ -869,6 +869,11 @@ def main():
 
     TRACE.write("THE-SPIRAL COMPLETE TRACE\n" + "=" * 64 + "\n")
     TRACE.flush()
+
+    # Install now that a trace exists to mark: before this point a signal
+    # kills the process before any trace (or partial trace) exists at all.
+    signal.signal(signal.SIGTERM, _terminate)
+    signal.signal(signal.SIGHUP, _terminate)
 
     print()
     emit(f"{col.BOLD}  🌀 THE SPIRAL {col.DIM}v1.1.6 — the complete descent · L0 → L22 · maximum depth{col.END}")

@@ -357,5 +357,28 @@ class TestKnownBugs(unittest.TestCase):
                     self.assertNotIn("SUMMARY (JSON)", content)
 
 
+class TestSafeText(unittest.TestCase):
+    """Unicode controls in the question must be neutralized (security audit
+    round 7): bidi overrides, zero-width format characters, and C1 controls
+    can spoof or reorder terminal output and poison trace layout, while
+    legitimate non-Latin text must pass through unchanged."""
+
+    def test_question_unicode_controls_neutralized(self):
+        arabic = "\u0645\u0631\u062d\u0628\u0627"  # مرحبا
+        with tempfile.TemporaryDirectory() as td:
+            r = run_script("the_spiral.py",
+                           ["-q", f"evil \u202e spoof \u200b \x9b end {arabic}",
+                            "--fast", "--live", "0.05", "--seconds", "1",
+                            "--trace", os.path.join(td, "t.log")],
+                           timeout=60)
+            self.assertEqual(r.returncode, 0, r.stderr[-300:])
+            self.assertIn("\\u202e", r.stdout)   # right-to-left override escaped
+            self.assertIn("\\u200b", r.stdout)   # zero-width space escaped
+            self.assertIn("\\u009b", r.stdout)   # C1 CSI escaped
+            self.assertNotIn("\u202e", r.stdout)  # no raw override survives
+            self.assertNotIn("\u200b", r.stdout)
+            self.assertIn(arabic, r.stdout)       # real script text kept
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

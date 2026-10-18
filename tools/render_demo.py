@@ -202,7 +202,9 @@ def render(samples, out_path, font_path, cell_w=9, cell_h=18, font_px=14):
     # merge consecutive identical screens (full state: chars + colors + bold)
     screens = []  # [snapshot, total_ms]
     for (_, snap), hold in zip(samples, holds):
-        ms = max(int(hold * 1000), 20)
+        # GIF frame delays are 16-bit; clamp pathological holds (e.g. a
+        # hostile cast with a years-long final gap) instead of erroring
+        ms = min(max(int(hold * 1000), 20), 600_000)
         if screens and screens[-1][0] == snap:
             screens[-1][1] += ms
         else:
@@ -267,9 +269,25 @@ def main():
         sys.exit(f"cannot read {cast_path}: {e}")
     try:
         hdr = json.loads(lines[0])
-        cols, rows = int(hdr["width"]), int(hdr["height"])
-    except (IndexError, KeyError, TypeError, ValueError) as e:
+    except (IndexError, ValueError) as e:
         sys.exit(f"malformed cast header in {cast_path}: {e}")
+    if not isinstance(hdr, dict):
+        sys.exit(f"malformed cast header in {cast_path}: not a JSON object")
+    try:
+        cols, rows = hdr["width"], hdr["height"]
+    except KeyError as e:
+        sys.exit(f"malformed cast header in {cast_path}: missing {e}")
+    # A terminal grid is allocated per event snapshot, so hostile dimensions
+    # are the renderer's main memory/CPU amplifier: a 44-byte cast claiming
+    # 100000x100000 cells never finishes. Require true integers and bound
+    # the total grid (the largest realistic recordings are ~300x100).
+    MAX_CELLS = 100_000
+    if (isinstance(cols, bool) or isinstance(rows, bool)
+            or not isinstance(cols, int) or not isinstance(rows, int)
+            or cols < 1 or rows < 1 or cols * rows > MAX_CELLS):
+        sys.exit(f"malformed cast header in {cast_path}: width/height must be "
+                 f"positive integers totaling at most {MAX_CELLS} cells, "
+                 f"got {cols!r} x {rows!r}")
     term = Term(cols, rows)
     samples = []   # (timestamp, snapshot)
     last_t, final_t = 0.0, 0.0
@@ -288,6 +306,9 @@ def main():
             sys.exit(f"malformed timestamp on cast line {n} in {cast_path}: {t!r}")
         if not math.isfinite(t):
             sys.exit(f"non-finite timestamp on cast line {n} in {cast_path}: {t}")
+        if not isinstance(data, str):
+            sys.exit(f"malformed event data on cast line {n} in {cast_path}: "
+                     f"expected string, got {type(data).__name__}")
         term.feed(data)
         final_t = max(final_t, t)
         if t - last_t >= 0.12:
