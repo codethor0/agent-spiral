@@ -4,6 +4,7 @@
 ![python](https://img.shields.io/badge/python-3.8%2B-blue)
 ![deps](https://img.shields.io/badge/dependencies-none-brightgreen)
 ![platform](https://img.shields.io/badge/platform-linux%20%7C%20macos-lightgrey)
+![tests](https://github.com/codethor0/agent-spiral/actions/workflows/tests.yml/badge.svg)
 
 Terminal simulations of an AI agent that never comes back.
 
@@ -40,6 +41,9 @@ python3 the_spiral.py --from L15   # start at a level
 python3 stuck_agent.py -q "your question"
 ```
 
+`--seconds N` is not a whole-program deadline: it bounds only the two live
+loops (L4 decode, L12 clock). The remaining levels still run to completion.
+
 No dependencies. Standard library only. Python 3.8+.
 
 ## Demo
@@ -55,9 +59,14 @@ Stdlib-only suite (no dependencies beyond Python itself):
 python3 -m unittest discover -s tests
 ```
 
-18 tests cover compile sanity, bounded runs of all five scripts, trace JSON
-validity, argument validation exit codes, broken-pipe and closed-stdout
-behavior, and Ctrl+C reporting. Runtime is about a minute.
+51 tests across three files cover compile sanity, bounded runs of all five
+scripts, trace JSON validity, argument validation exit codes, broken-pipe
+and closed-stdout behavior, Ctrl+C reporting, independent recomputation of
+the hardware model constants, and terminal-renderer escape sequences. The
+renderer tests require Pillow and are skipped when it is not installed;
+CI installs it, so every test executes in the matrix. Runtime is about a
+minute. CI runs the suite on Linux and macOS for every push and pull
+request.
 
 ## What a run produces
 
@@ -90,6 +99,10 @@ weights, GQA attention. The KV cache, FLOP, latency, and energy figures
 follow from that model. Physics content (nuclear scale, confinement,
 Standard Model, Planck scale) is standard material. The live demos are
 visualizations, not measurements.
+
+Experimentally verified physics in the descent ends around 10^-18 m
+(particle scales). Everything from the Planck wall down is theoretical —
+real math, but not measured nature — and the simulations label it as such.
 
 ## Repository layout
 

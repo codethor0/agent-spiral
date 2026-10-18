@@ -414,7 +414,7 @@ def descent_report(args, st):
         "flop_per_mma": MMA_FLOP,
         "ms_per_token_floor": round(TOK_MEM_MS, 1),
         "finding": "the loop is fractal; only meaning-layer (<=L6) can break it",
-        "watchdog_inventory": {"automated": 0, "human_operator_ctrl_c": 4},
+        "field_session_record": {"automated_guards_fired": 0, "human_ctrl_c": "4/4"},
     }
     try:
         with open(args.trace, "w", encoding="utf-8") as f:

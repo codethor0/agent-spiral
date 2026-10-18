@@ -76,7 +76,7 @@ THE-SPIRAL COMPLETE TRACE
 
 │  ── status ── gen=126 · ctx=134 · KV=0.02 GiB · 189 tok/s
 │     eos p ≈ 0.0003 (never rises) · 4-gram peak "… actually— hold" ×3 → penalty=1.0
-│     GPU util 97% (working perfectly) · energy 0.16 Wh · bill $0.0005
+│     GPU util 97% (working perfectly) · energy 0.17 Wh · bill $0.0005
 │  ⠿ stream: "…old on what if the premise is wrong?wait, let me reconsider that"
 │  ⠿ stream: "…se is wrong?wait, let me reconsider that… actually— hold on what"
 │  ⠿ stream: "…reconsider that… actually— hold on what if the premise is wrong?"
@@ -109,7 +109,7 @@ THE-SPIRAL COMPLETE TRACE
 │  one token = 3,906,250 MMAs. pure math ~15µs; real decode 4.8 ms — bandwidth-bound, not compute-bound.
 
 │  live ticker — 'stuck' from inside the die:
-│  the die produced ~8.1 GFLOP of flawless, useless math.
+│  the die produced ~8.2 GFLOP of flawless, useless math.
 │  nothing above the MMA knows it's wasted. nothing below knows there was a question.
 
 ┌─ L9 · THE NUMBER — one weight, literally ─────────────────────────────────────────────────
@@ -211,12 +211,19 @@ THE-SPIRAL COMPLETE TRACE
 ┌─ L20 · THE PLANCK WALL — where the word 'deeper' breaks ──────────────────────────────────
 │  planck length 1.6×10⁻³⁵ m · planck time 5.4×10⁻⁴⁴ s
 │  resolving anything smaller needs so much energy in so small a volume that
-│  it collapses into a black hole. resolution impossible — not hard, impossible.
+│  it collapses into a black hole. with known physics, resolution fails —
+│  'smaller' stops being answerable. not a proven limit of nature — the limit
+│  of the math we currently have. the wall is a boundary of theory, not a
+│  measured wall of the universe.
 │  one GPU clock tick spans ~10³⁴ planck ticks. eternity is granular.
 
 │  live: the zoom counter, keyboard → wall:
-│  total zoom: ×10³³. physics verified at every stop — then the road ends,
-│  not with a thing, but with the end of the CONCEPT of size.
+│  total zoom: ×10³³. physics verified down to ~10⁻¹⁸ m; below that the map
+│  is theory, labeled as such — then the road ends, not with a thing, but with
+│  the end of the CONCEPT of size as current physics can define it.
+│  two reference frames, both honest: the counter counts orders below
+│  1 m (×10^35 lands on the 10^-35 m wall); from the 10^-2 m keycap that
+│  asked the question, the trip itself is ×10^33.
 
 ┌─ L21 · THE EDGE — here be dragons ────────────────────────────────────────────────────────
 │  the honest inventory of what 'deeper' cannot currently answer
@@ -254,7 +261,7 @@ THE-SPIRAL COMPLETE TRACE
   ════════════════════════════════════════════════════════════════════════════
 
   runtime             : 0:00:08
-  tokens generated    : 149 (answer produced: NO) · switch-cycles: 68
+  tokens generated    : 147 (answer produced: NO) · switch-cycles: 67
   zoom                : ×10³³ — from keycap to the planck wall
 
   the ladder:
@@ -278,7 +285,7 @@ THE-SPIRAL COMPLETE TRACE
     L17  —        standard model    3 particles + 2 forces run everything
     L18  —        quantum fields    particles = ripples in universal fields
     L19  —        measurement       collapse with no mechanism — since 1927
-    L20  10⁻³⁵ m  planck wall       'smaller' stops being a thing
+    L20  10⁻³⁵ m  planck wall       'smaller' stops being answerable
     L21  —        the edge          honest unknowns: gravity, vacuum, dark sector
     L22  —        below the wall    hypotheses with no floor yet
 
@@ -319,7 +326,7 @@ THE-SPIRAL COMPLETE TRACE
     the human             
       fail : watches a spinner
       guard: Ctrl+C
-      armed: YES — 4/4. the only control that worked.
+      armed: YES — 4/4 in field sessions; this run's control is reported in the summary
 
   bottom line for security engineering:
     every automated layer was present and healthy. zero automated guards
@@ -330,7 +337,9 @@ THE-SPIRAL COMPLETE TRACE
   the question outlasted HTTP, CUDA, silicon, atoms, nuclei, quarks,
   fields, and the planck wall. the loop was never in the machine.
   the machine was a place the loop briefly stopped.
-  watchdog inventory: automated 0 · human (operator, Ctrl+C) 4/4.
+
+  watchdog inventory, this run: simulated-agent guards fired 0 · demo control that ended it: operator deadline (--seconds 1s).
+  field sessions to date: automated 0 · human Ctrl+C 4/4.
 
 ================================================================
 SUMMARY (JSON)
@@ -443,7 +452,7 @@ SUMMARY (JSON)
     "L20": {
       "name": "planck wall",
       "scale": "10\u207b\u00b3\u2075 m",
-      "what": "'smaller' stops being a thing"
+      "what": "'smaller' stops being answerable"
     },
     "L21": {
       "name": "the edge",
@@ -456,9 +465,9 @@ SUMMARY (JSON)
       "what": "hypotheses with no floor yet"
     }
   },
-  "tokens_generated": 149,
+  "tokens_generated": 147,
   "answer_produced": false,
-  "switch_cycles": 68,
+  "switch_cycles": 67,
   "total_zoom": "1e33 (keycap to planck)",
   "guard_map": [
     {
@@ -507,13 +516,15 @@ SUMMARY (JSON)
       "layer": "the human",
       "failure": "watches a spinner",
       "guard": "Ctrl+C",
-      "armed": "YES \u2014 4/4. the only control that worked."
+      "armed": "YES \u2014 4/4 in field sessions; this run's control is reported in the summary"
     }
   ],
-  "guards_armed": 0,
-  "guards_that_worked": [
-    "human: Ctrl+C 4/4"
-  ],
+  "simulated_agent_guards_fired": 0,
+  "demo_control_that_ended_this_run": "operator deadline (--seconds 1s)",
+  "field_session_record": {
+    "automated_guards_fired": 0,
+    "human_ctrl_c": "4/4"
+  },
   "finding": "the spiral is fractal and a legal state of matter; it can only be broken at meaning layers L0\u2013L6; zero automated guards fired in field sessions",
   "deepest_verified_m": 1e-18,
   "planck_wall_m": 1.6e-35,
