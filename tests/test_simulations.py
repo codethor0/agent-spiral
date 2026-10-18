@@ -11,8 +11,8 @@ Covers: compile/import sanity, full fast runs with --seconds, trace JSON
 validity, exit codes (bad args, broken pipe), Ctrl+C reporting, and the
 terminal-live sections reached via tiny --live values.
 
-The Planck-zoom test is marked expectedFailure: it documents a known bug
-where the L20 zoom animation never reaches the wall at default settings.
+TestKnownBugs holds regression tests for defects fixed in v1.1.4 (the
+Planck-zoom animation reaching the wall inside the live window).
 """
 
 import json
@@ -181,55 +181,48 @@ class TestExitBehavior(unittest.TestCase):
 class TestCtrlCReport(unittest.TestCase):
     """SIGINT anywhere in the descent must still produce the final report."""
 
-    def _interrupt(self, script, args, sig_after, trace):
-        if os.path.exists(trace):
-            os.remove(trace)
-        env = dict(os.environ, TERM="dumb")
-        p = subprocess.Popen(
-            [sys.executable, os.path.join(REPO_ROOT, script)] + args + ["--trace", trace],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
-        time.sleep(sig_after)
-        p.send_signal(signal.SIGINT)
-        try:
-            out, _ = p.communicate(timeout=30)
-        except subprocess.TimeoutExpired:
-            p.kill()
-            p.communicate()
-            self.fail(f"{script} hung after SIGINT")
-        self.assertNotIn("Traceback", out.decode(errors="replace"))
-        return p.returncode, trace
+    def _interrupt(self, script, args, sig_after):
+        """SIGINT the script, then return (exit code, parsed summary)."""
+        with tempfile.TemporaryDirectory() as td:
+            trace = os.path.join(td, "trace.log")
+            env = dict(os.environ, TERM="dumb")
+            p = subprocess.Popen(
+                [sys.executable, os.path.join(REPO_ROOT, script)] + args + ["--trace", trace],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
+            time.sleep(sig_after)
+            p.send_signal(signal.SIGINT)
+            try:
+                out, _ = p.communicate(timeout=30)
+            except subprocess.TimeoutExpired:
+                p.kill()
+                p.communicate()
+                self.fail(f"{script} hung after SIGINT")
+            self.assertNotIn("Traceback", out.decode(errors="replace"))
+            marker = ("PATHOLOGY SUMMARY (JSON)"
+                      if script == "stuck_agent.py" else "SUMMARY (JSON)")
+            d = extract_summary_json(trace, marker=marker)
+            return p.returncode, d
 
     def test_spiral_ctrl_c(self):
-        rc, trace = self._interrupt(
-            "the_spiral.py", ["--fast", "--live", "0.5"], 5,
-            os.path.join(tempfile.gettempdir(), "as_test_spiral.log"))
+        rc, d = self._interrupt(
+            "the_spiral.py", ["--fast", "--live", "0.5"], 5)
         self.assertEqual(rc, 0)
-        d = extract_summary_json(trace)
         self.assertEqual(d["stopped_by"], "operator interrupt (Ctrl+C)")
         self.assertGreater(d["tokens_generated"], 0)
 
     def test_stack_spiral_ctrl_c(self):
-        rc, trace = self._interrupt(
-            "agent_stack_spiral.py", ["--fast"], 5,
-            os.path.join(tempfile.gettempdir(), "as_test_stack.log"))
+        rc, d = self._interrupt("agent_stack_spiral.py", ["--fast"], 5)
         self.assertEqual(rc, 0)
-        d = extract_summary_json(trace)
         self.assertEqual(d["stopped_by"], "operator interrupt (Ctrl+C)")
 
     def test_stuck_agent_ctrl_c(self):
-        rc, trace = self._interrupt(
-            "stuck_agent.py", ["--fast"], 3,
-            os.path.join(tempfile.gettempdir(), "as_test_stuck.log"))
+        rc, d = self._interrupt("stuck_agent.py", ["--fast"], 3)
         self.assertEqual(rc, 0)
-        d = extract_summary_json(trace, marker="PATHOLOGY SUMMARY (JSON)")
         self.assertEqual(d["stopped_by"], "operator interrupt (Ctrl+C)")
 
     def test_deeper_ctrl_c(self):
-        rc, trace = self._interrupt(
-            "deeper_than_this.py", ["--fast"], 5,
-            os.path.join(tempfile.gettempdir(), "as_test_deeper.log"))
+        rc, d = self._interrupt("deeper_than_this.py", ["--fast"], 5)
         self.assertEqual(rc, 0)
-        d = extract_summary_json(trace)
         self.assertEqual(d["stopped_by"], "operator interrupt (Ctrl+C)")
 
 
@@ -240,10 +233,10 @@ class TestKnownBugs(unittest.TestCase):
         """l20_planck drives the zoom from elapsed time, so the animation
         must reach 10^35 within the default live window (v1.1.3 and earlier
         stalled around 10^3 — the PLANCK LENGTH label was never shown)."""
-        r = run_script("the_spiral.py",
-                       ["--from", "L20", "--live", "6", "--trace",
-                        os.path.join(tempfile.gettempdir(), "as_zoom.log")],
-                       timeout=30)
+        with tempfile.TemporaryDirectory() as td:
+            r = run_script("the_spiral.py",
+                           ["--from", "L20", "--live", "6", "--trace",
+                            os.path.join(td, "zoom.log")], timeout=30)
         zooms = [ln for ln in r.stdout.splitlines() if "zoom ×10^" in ln]
         self.assertTrue(zooms, "no zoom output captured")
         last = zooms[-1]

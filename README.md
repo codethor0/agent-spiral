@@ -4,6 +4,7 @@
 ![python](https://img.shields.io/badge/python-3.8%2B-blue)
 ![deps](https://img.shields.io/badge/dependencies-none-brightgreen)
 ![platform](https://img.shields.io/badge/platform-linux%20%7C%20macos-lightgrey)
+![tests](https://github.com/codethor0/agent-spiral/actions/workflows/tests.yml/badge.svg)
 
 Terminal simulations of an AI agent that never comes back.
 
@@ -55,9 +56,13 @@ Stdlib-only suite (no dependencies beyond Python itself):
 python3 -m unittest discover -s tests
 ```
 
-18 tests cover compile sanity, bounded runs of all five scripts, trace JSON
-validity, argument validation exit codes, broken-pipe and closed-stdout
-behavior, and Ctrl+C reporting. Runtime is about a minute.
+45 tests across three files cover compile sanity, bounded runs of all five
+scripts, trace JSON validity, argument validation exit codes, broken-pipe
+and closed-stdout behavior, Ctrl+C reporting, independent recomputation of
+the hardware model constants, and terminal-renderer escape sequences. The
+renderer tests require Pillow and are skipped when it is not installed.
+Runtime is about a minute. CI runs the suite on Linux and macOS for every
+push and pull request.
 
 ## What a run produces
 

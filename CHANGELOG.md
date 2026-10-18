@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased
+
+Fourth audit round (branch audit/v1.1.4-full-review), verified by an
+expanded automated suite.
+
+- Fix tools/render_demo.py: OSC sequences terminated by ST (ESC \) no
+  longer leave a stray backslash on screen; missing/insufficient command
+  line arguments now print a usage message and exit 2 instead of an
+  IndexError traceback.
+- the_spiral.py and deepest.py L20: the zoom window now measures elapsed
+  time with time.monotonic(), so wall-clock adjustments cannot stall or
+  skip the animation; both levels now state the two reference frames
+  explicitly (counter counts orders below 1 m; the keycap-to-wall trip is
+  x10^33).
+- Add tests/test_render_demo.py (16 tests): renderer escape sequences,
+  OSC-BEL / OSC-ST termination, split sequences, deferred autowrap, CLI
+  validation. Skips without Pillow.
+- Add tests/test_numerics.py (11 tests): independent recomputation of the
+  hardware model (KV bytes per token, weight GiB, KV pool, per-token
+  memory floor, MMA FLOP, clock period, DRAM cell counts) plus ladder
+  scale ordering.
+- Fix stale test-module documentation and give every interrupt test its
+  own temporary directory (no shared fixed paths).
+- Add .github/workflows/tests.yml: runs the suite on Linux and macOS,
+  Python 3.9-3.13, on push and pull request.
+- Suite is now 45 tests; docs/demo.gif re-recorded after the L20 note.
+
 ## 1.1.4 - 2026-10-18
 
 Third review round, verified by a new automated test suite.

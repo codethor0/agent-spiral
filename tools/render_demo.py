@@ -142,14 +142,22 @@ class Term:
                 i = j + 1
                 continue
             if ch == "\x1b" and i + 1 < n and text[i + 1] == "]":
-                # OSC (title, etc.): skip to BEL or the next ESC
+                # OSC (title, etc.): skip to BEL or ST (ESC \)
                 j = text.find("\a", i + 2)
                 if j < 0:
                     j = text.find("\x1b", i + 2)
                 if j < 0:
                     self.pending = text[i:]
                     break
-                i = j + 1
+                if text[j] == "\x1b":
+                    # ST is ESC + backslash: consume both. A different ESC
+                    # starts a new sequence: leave it for the main loop.
+                    if j + 1 < n and text[j + 1] == "\\":
+                        i = j + 2
+                    else:
+                        i = j
+                    continue
+                i = j + 1  # BEL
                 continue
             if ch == "\x1b":
                 if i + 1 >= n:
@@ -238,6 +246,9 @@ def default_font():
 
 
 def main():
+    if len(sys.argv) < 3:
+        print("usage: render_demo.py cast out.gif [font.ttf]", file=sys.stderr)
+        sys.exit(2)
     cast_path, out_path = sys.argv[1], sys.argv[2]
     font_path = sys.argv[3] if len(sys.argv) > 3 else default_font()
     try:

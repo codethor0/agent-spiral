@@ -535,12 +535,13 @@ def l20_planck(args):
               (-14, "nucleus · 10⁻¹⁴ m — L15"), (-18, "quark structure · 10⁻¹⁸ m — L16"),
               (-33, "string-scale proposals · 10⁻³³ m — UNVERIFIED"),
               (-35, "PLANCK LENGTH · 10⁻³⁵ m — beyond this, 'smaller' is not a thing")]
-    exp, t0 = 0.0, time.time()
-    while time.time() - t0 < args.live:
-        # elapsed-time-driven: the zoom always lands on the wall with ~15%
-        # of the window to hold it (a fixed per-iteration decrement needed
-        # ~64s and never got past 10^3 at default --live 6)
-        exp = -35.0 * min(1.0, (time.time() - t0) / (args.live * 0.85))
+    exp, t0 = 0.0, time.monotonic()
+    while time.monotonic() - t0 < args.live:
+        # elapsed-time-driven (monotonic, so clock adjustments can't stall
+        # or skip it): the zoom always lands on the wall with ~15% of the
+        # window to hold it (a fixed per-iteration decrement needed ~64s
+        # and never got past 10^3 at default --live 6)
+        exp = -35.0 * min(1.0, (time.monotonic() - t0) / (args.live * 0.85))
         bar_len = int((-exp / 35.0) * 46)
         bar = f"{col.RED}{'█' * bar_len}{col.DIM}{'░' * (46 - bar_len)}{col.END}"
         cur = next((lab for thr, lab in reversed(labels) if exp <= thr), labels[0][1])
@@ -552,6 +553,9 @@ def l20_planck(args):
     clear_line()
     emit(f"│  {col.YELLOW}total zoom: ×10³³. physics verified at every stop — then the road ends,")
     emit(f"│  {col.YELLOW}not with a thing, but with the end of the CONCEPT of size.{col.END}")
+    note("two reference frames, both honest: the counter counts orders below")
+    note("1 m (×10^35 lands on the 10^-35 m wall); from the 10^-2 m keycap that")
+    note("asked the question, the trip itself is ×10^33.")
 
 
 def l21_edge(args):

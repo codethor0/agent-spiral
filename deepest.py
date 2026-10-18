@@ -314,13 +314,14 @@ def l20_planck(args):
         (-33, "string-scale proposals · 10⁻³³ m — UNVERIFIED"),
         (-35, "PLANCK LENGTH · 10⁻³⁵ m — beyond this, 'smaller' is not a thing"),
     ]
-    t0 = time.time()
+    t0 = time.monotonic()
     run_for = args.demo_seconds
     exp = 0.0
-    while time.time() - t0 < run_for:
-        # elapsed-time-driven so the zoom always reaches the wall inside the
-        # demo window (a fixed per-iteration decrement needed ~64s at 1x)
-        exp = -35.0 * min(1.0, (time.time() - t0) / (run_for * 0.85))
+    while time.monotonic() - t0 < run_for:
+        # elapsed-time-driven (monotonic, so clock adjustments can't stall
+        # or skip it): the zoom always reaches the wall inside the demo
+        # window (a fixed per-iteration decrement needed ~64s at 1x)
+        exp = -35.0 * min(1.0, (time.monotonic() - t0) / (run_for * 0.85))
         bar_len = int((-exp / 35.0) * 46)
         bar = f"{col.RED}{'█' * bar_len}{col.DIM}{'░' * (46 - bar_len)}{col.END}"
         cur = next((lab for thr, lab in reversed(labels) if exp <= thr), labels[0][1])
@@ -334,6 +335,9 @@ def l20_planck(args):
     say(f"{col.BOLD}total zoom from your key to the wall: ×10³³.{col.END} physics was")
     say("verified at every stop… and then the road simply ends. not with a thing —")
     say("with the end of the CONCEPT of size.")
+    note("two reference frames, both honest: the counter counts orders below")
+    note("1 m (×10^35 lands on the 10^-35 m wall); from the 10^-2 m keycap that")
+    note("asked the question, the trip itself is ×10^33.")
 
 
 # ────────────────────────────────────────────────────────────────────────────
