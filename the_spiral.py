@@ -71,6 +71,31 @@ RUN = {"started": None}
 TRACE = None  # trace file spooled incrementally; opened in main()
 
 
+def _terminate(signum, _frame):
+    # SIGTERM/SIGHUP (unlike Ctrl+C) have no report path: mark the spooled
+    # trace as interrupted so a partial handoff can never be mistaken for
+    # a complete one, then die with the conventional 128+signal code.
+    # Registered at import time so there is no window before main() where
+    # a signal would kill the process and leave an unmarked partial trace.
+    global TRACE
+    try:
+        if TRACE is not None and not TRACE.closed:
+            try:
+                TRACE.write(f"\n[TRACE INTERRUPTED — terminated by signal {signum}; "
+                            "this run did not complete]\n")
+                TRACE.flush()
+                TRACE.close()
+            except OSError:
+                pass
+    except Exception:
+        pass
+    sys.exit(128 + signum)
+
+
+signal.signal(signal.SIGTERM, _terminate)
+signal.signal(signal.SIGHUP, _terminate)
+
+
 def safe_text(s):
     # neutralize control characters so question text can never emit terminal
     # escapes or break trace layout; printable text (incl. unicode) is kept
@@ -839,23 +864,6 @@ def main():
     except OSError as e:
         print(f"cannot open trace file {args.trace}: {e}")
         sys.exit(1)
-
-    def _terminate(signum, _frame):
-        # SIGTERM/SIGHUP (unlike Ctrl+C) have no report path: mark the spooled
-        # trace as interrupted so a partial handoff can never be mistaken for
-        # a complete one, then die with the conventional 128+signal code.
-        if TRACE is not None and not TRACE.closed:
-            try:
-                TRACE.write(f"\n[TRACE INTERRUPTED — terminated by signal {signum}; "
-                            "this run did not complete]\n")
-                TRACE.flush()
-                TRACE.close()
-            except OSError:
-                pass
-        sys.exit(128 + signum)
-
-    signal.signal(signal.SIGTERM, _terminate)
-    signal.signal(signal.SIGHUP, _terminate)
 
     TRACE.write("THE-SPIRAL COMPLETE TRACE\n" + "=" * 64 + "\n")
     TRACE.flush()
