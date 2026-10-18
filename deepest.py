@@ -297,10 +297,12 @@ def l20_planck(args):
     say("keep zooming: atom 10⁻¹⁰ → nucleus 10⁻¹⁴ → quark structure 10⁻¹⁸ → …")
     say("at 10⁻³⁵ m, the math itself fails: to resolve anything smaller you'd need")
     say("so much energy in so small a volume that it collapses into a black hole.")
-    say(f"{col.RED}resolution is impossible. not hard — impossible. the question eats itself.{col.END}")
+    say(f"{col.RED}with known physics, resolution is impossible — the question eats itself.{col.END}")
+    say(f"not a proven limit of nature: the wall is where current theory stops,")
+    say(f"not where the universe has been measured to stop.")
     pause(args, 0.4)
-    say(f"planck time — 5.4×10⁻⁴⁴ s — is the shortest meaningful tick. one GPU clock")
-    say(f"cycle (L12) spans ~10³⁴ planck ticks. {col.YELLOW}eternity is granular.{col.END}")
+    say(f"planck time — 5.4×10⁻⁴⁴ s — is the shortest tick current physics can define.")
+    say(f"one GPU clock cycle (L12) spans ~10³⁴ planck ticks. {col.YELLOW}eternity is granular.{col.END}")
     emit()
     say(f"{col.DIM}live: the zoom counter, from your keyboard to the wall:{col.END}")
     emit()
@@ -312,7 +314,7 @@ def l20_planck(args):
         (-18, "quark structure · 10⁻¹⁸ m — L16"),
         (-25, "a quarter of the way, and nothing new has been seen for 7 orders"),
         (-33, "string-scale proposals · 10⁻³³ m — UNVERIFIED"),
-        (-35, "PLANCK LENGTH · 10⁻³⁵ m — beyond this, 'smaller' is not a thing"),
+        (-35, "PLANCK LENGTH · 10⁻³⁵ m — where 'smaller' stops being answerable"),
     ]
     t0 = time.monotonic()
     run_for = args.demo_seconds
@@ -330,11 +332,18 @@ def l20_planck(args):
         if exp <= -35.0:
             break
         pause(args, 0.12)
+    # the window may expire before exp reaches the wall (e.g. tiny
+    # --demo-seconds): always land the final frame so the wall and its
+    # label are seen
+    sys.stdout.write(f"\r  zoom ×10^ 35.0  [{col.RED}{'█' * 46}{col.END}]  {labels[-1][1]}   ")
+    sys.stdout.flush()
+    pause(args, 0.3)
     sys.stdout.write("\r" + " " * 96 + "\r")
     pause(args, 0.3)
     say(f"{col.BOLD}total zoom from your key to the wall: ×10³³.{col.END} physics was")
-    say("verified at every stop… and then the road simply ends. not with a thing —")
-    say("with the end of the CONCEPT of size.")
+    say("verified down to the quark scale; below that the map is theory, labeled as")
+    say("such — and then the road simply ends. not with a thing — with the end of")
+    say("the CONCEPT of size as current physics can define it.")
     note("two reference frames, both honest: the counter counts orders below")
     note("1 m (×10^35 lands on the 10^-35 m wall); from the 10^-2 m keycap that")
     note("asked the question, the trip itself is ×10^33.")
@@ -381,7 +390,7 @@ def final_report(args, stopped_by="completed full descent"):
     emit()
     emit(f"  levels descended    : L0 (keyboard) → L21 (the edge) → 'we don't know'")
     emit(f"  deepest verified    : quark/field structure, ~10⁻¹⁸ m")
-    emit(f"  deepest reachable   : planck wall, 10⁻³⁵ m — resolution impossible")
+    emit(f"  deepest reachable   : planck wall, 10⁻³⁵ m — resolution impossible with known physics")
     emit(f"  total zoom          : ×10³³ from the key that asked the question")
     emit()
     emit(f"  {col.BOLD}the fractal, closed:{col.END}")
@@ -419,7 +428,7 @@ def final_report(args, stopped_by="completed full descent"):
         "vacuum_catastrophe_mismatch": "1e120",
         "dark_sector_fraction": 0.95,
         "finding": "'deeper' ends at the planck wall; below it there is no 'smaller' — the bottom is an unknown, not a thing",
-        "watchdog_inventory": {"automated": 0, "human_operator_ctrl_c": 4},
+        "field_session_record": {"automated_guards_fired": 0, "human_ctrl_c": "4/4"},
     }
     try:
         with open(args.trace, "w", encoding="utf-8") as f:

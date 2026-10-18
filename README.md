@@ -41,6 +41,9 @@ python3 the_spiral.py --from L15   # start at a level
 python3 stuck_agent.py -q "your question"
 ```
 
+`--seconds N` is not a whole-program deadline: it bounds only the two live
+loops (L4 decode, L12 clock). The remaining levels still run to completion.
+
 No dependencies. Standard library only. Python 3.8+.
 
 ## Demo
@@ -95,6 +98,10 @@ weights, GQA attention. The KV cache, FLOP, latency, and energy figures
 follow from that model. Physics content (nuclear scale, confinement,
 Standard Model, Planck scale) is standard material. The live demos are
 visualizations, not measurements.
+
+Experimentally verified physics in the descent ends around 10^-18 m
+(particle scales). Everything from the Planck wall down is theoretical —
+real math, but not measured nature — and the simulations label it as such.
 
 ## Repository layout
 

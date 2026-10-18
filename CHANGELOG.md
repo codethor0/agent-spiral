@@ -5,6 +5,26 @@
 Fourth audit round (branch audit/v1.1.4-full-review), verified by an
 expanded automated suite.
 
+- the_spiral.py: the trace summary no longer reports human Ctrl+C
+  unconditionally. New fields: simulated_agent_guards_fired (always 0 in
+  the simulation), demo_control_that_ended_this_run (Ctrl+C, --seconds
+  deadline, or none), and field_session_record (the 4/4 history, clearly
+  labeled as such). deeper_than_this.py and deepest.py watchdog fields
+  relabeled to field_session_record for the same reason.
+- the_spiral.py and deepest.py L20: the Planck-length endpoint frame is
+  always displayed, even for very short --live / --demo-seconds windows
+  that expire before the animation lands on 10^35.
+- Absolute Planck-scale wording qualified in both scripts: the wall is
+  presented as the limit of current theory ("with known physics",
+  "shortest tick current physics can define"), not a measured limit of
+  nature. README Accuracy section states where verified physics ends
+  (~10^-18 m) and theory begins.
+- --seconds help text and README now state explicitly that it bounds only
+  the L4/L12 live loops, not the whole descent.
+- Add 4 regression tests (49 total): endpoint frame on tiny windows,
+  demo_control on timeout and Ctrl+C runs, no absolute Planck claims in
+  source.
+
 - Fix tools/render_demo.py: OSC sequences terminated by ST (ESC \) no
   longer leave a stray backslash on screen; missing/insufficient command
   line arguments now print a usage message and exit 2 instead of an

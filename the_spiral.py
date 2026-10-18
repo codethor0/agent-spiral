@@ -526,7 +526,10 @@ def l20_planck(args):
            "planck length 1.6×10⁻³⁵ m · planck time 5.4×10⁻⁴⁴ s")
     pause(args, 0.4)
     say("resolving anything smaller needs so much energy in so small a volume that")
-    say(f"it collapses into a black hole. {col.RED}resolution impossible — not hard, impossible.{col.END}")
+    say(f"it collapses into a black hole. {col.RED}with known physics, resolution fails —")
+    say(f"'smaller' stops being answerable.{col.END} not a proven limit of nature — the limit")
+    say(f"of the math we currently have. {col.YELLOW}the wall is a boundary of theory, not a")
+    say(f"measured wall of the universe.{col.END}")
     say(f"one GPU clock tick spans ~10³⁴ planck ticks. {col.YELLOW}eternity is granular.{col.END}")
     emit()
     say(f"{col.DIM}live: the zoom counter, keyboard → wall:{col.END}")
@@ -534,7 +537,7 @@ def l20_planck(args):
               (-5, "living cell · 10⁻⁵ m"), (-10, "atom · 10⁻¹⁰ m — L14"),
               (-14, "nucleus · 10⁻¹⁴ m — L15"), (-18, "quark structure · 10⁻¹⁸ m — L16"),
               (-33, "string-scale proposals · 10⁻³³ m — UNVERIFIED"),
-              (-35, "PLANCK LENGTH · 10⁻³⁵ m — beyond this, 'smaller' is not a thing")]
+              (-35, "PLANCK LENGTH · 10⁻³⁵ m — where 'smaller' stops being answerable")]
     exp, t0 = 0.0, time.monotonic()
     while time.monotonic() - t0 < args.live:
         # elapsed-time-driven (monotonic, so clock adjustments can't stall
@@ -550,9 +553,15 @@ def l20_planck(args):
         if exp <= -35.0:
             break
         pause(args, 0.12)
+    # the window may expire before exp reaches the wall (e.g. --live 0.3):
+    # always land the final frame so the wall and its label are seen
+    sys.stdout.write(f"\r  zoom ×10^ 35.0  [{col.RED}{'█' * 46}{col.END}]  {labels[-1][1]}   ")
+    sys.stdout.flush()
+    pause(args, 0.3)
     clear_line()
-    emit(f"│  {col.YELLOW}total zoom: ×10³³. physics verified at every stop — then the road ends,")
-    emit(f"│  {col.YELLOW}not with a thing, but with the end of the CONCEPT of size.{col.END}")
+    emit(f"│  {col.YELLOW}total zoom: ×10³³. physics verified down to ~10⁻¹⁸ m; below that the map")
+    emit(f"│  {col.YELLOW}is theory, labeled as such — then the road ends, not with a thing, but with")
+    emit(f"│  {col.YELLOW}the end of the CONCEPT of size as current physics can define it.{col.END}")
     note("two reference frames, both honest: the counter counts orders below")
     note("1 m (×10^35 lands on the 10^-35 m wall); from the 10^-2 m keycap that")
     note("asked the question, the trip itself is ×10^33.")
@@ -624,7 +633,7 @@ LADDER = [
     ("L17", "standard model",  "—",       "3 particles + 2 forces run everything"),
     ("L18", "quantum fields",  "—",       "particles = ripples in universal fields"),
     ("L19", "measurement",     "—",       "collapse with no mechanism — since 1927"),
-    ("L20", "planck wall",     "10⁻³⁵ m", "'smaller' stops being a thing"),
+    ("L20", "planck wall",     "10⁻³⁵ m", "'smaller' stops being answerable"),
     ("L21", "the edge",        "—",       "honest unknowns: gravity, vacuum, dark sector"),
     ("L22", "below the wall",  "—",       "hypotheses with no floor yet"),
 ]
@@ -690,13 +699,23 @@ def final_report(args, st4, st12):
     emit(f"  {col.DIM}the question outlasted HTTP, CUDA, silicon, atoms, nuclei, quarks,")
     emit(f"  fields, and the planck wall. the loop was never in the machine.")
     emit(f"  the machine was a place the loop briefly stopped.{col.END}")
-    emit(f"  watchdog inventory: automated 0 · human (operator, Ctrl+C) 4/4.{col.END}")
     emit()
 
     stopped_by = ("operator interrupt (Ctrl+C)" if RUN.get("interrupted")
                   else next((s["stopped"] for s in (st4, st12)
                              if not s["stopped"].startswith("skipped")),
                             "completed full descent"))
+    if RUN.get("interrupted"):
+        demo_control = "human (operator, Ctrl+C)"
+    elif stopped_by.startswith("timeout"):
+        demo_control = f"operator deadline (--seconds {args.seconds}s)"
+    else:
+        demo_control = "none — full descent completed on its own"
+    emit(f"  watchdog inventory, this run: simulated-agent guards fired 0 · "
+         f"demo control that ended it: {demo_control}.")
+    emit(f"  {col.DIM}field sessions to date: automated 0 · human Ctrl+C 4/4.{col.END}")
+    emit()
+
     summary = {
         "simulation": "the-spiral v1.1.4 — complete descent L0→L22",
         "question": args.question,
@@ -708,8 +727,9 @@ def final_report(args, st4, st12):
         "switch_cycles": st12["cycles"],
         "total_zoom": "1e33 (keycap to planck)",
         "guard_map": [{"layer": l, "failure": f, "guard": g, "armed": p} for l, f, g, p in GUARDS],
-        "guards_armed": 0,
-        "guards_that_worked": ["human: Ctrl+C 4/4"],
+        "simulated_agent_guards_fired": 0,
+        "demo_control_that_ended_this_run": demo_control,
+        "field_session_record": {"automated_guards_fired": 0, "human_ctrl_c": "4/4"},
         "finding": ("the spiral is fractal and a legal state of matter; it can only be "
                     "broken at meaning layers L0–L6; zero automated guards fired in field sessions"),
         "deepest_verified_m": 1e-18,
@@ -773,7 +793,8 @@ def main():
     p = argparse.ArgumentParser(description="The complete descent: L0 → L22. As deep as we can go.")
     p.add_argument("-q", "--question", default="why did production go down last night?")
     p.add_argument("--seconds", type=positive_int, default=None,
-                   help="auto-stop live loops after N seconds (default: until Ctrl+C)")
+                   help="auto-stop the L4/L12 live loops after N seconds; the remaining "
+                        "descent still runs to completion (default: until Ctrl+C)")
     p.add_argument("--live", type=positive_float, default=6.0, help="seconds per live demo section")
     p.add_argument("--fast", action="store_true", help="4x speed")
     p.add_argument("--from", dest="from_level", default=None,

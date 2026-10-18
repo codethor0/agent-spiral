@@ -227,7 +227,7 @@ class TestCtrlCReport(unittest.TestCase):
 
 
 class TestKnownBugs(unittest.TestCase):
-    """Regression tests for bugs fixed in v1.1.4."""
+    """Regression tests for defects fixed after the v1.1.4 audit."""
 
     def test_planck_zoom_reaches_wall_in_live_window(self):
         """l20_planck drives the zoom from elapsed time, so the animation
@@ -243,6 +243,58 @@ class TestKnownBugs(unittest.TestCase):
         exp_val = float(last.split("zoom ×10^")[1].split()[0])
         self.assertGreaterEqual(exp_val, 35.0,
                                 f"zoom only reached 10^{exp_val} of 10^35")
+
+    def test_planck_zoom_endpoint_on_tiny_window(self):
+        """Even a very short --live must display the wall frame and label
+        (the window can expire before the animation lands on 10^35)."""
+        with tempfile.TemporaryDirectory() as td:
+            r = run_script("the_spiral.py",
+                           ["--from", "L20", "--live", "0.3", "--trace",
+                            os.path.join(td, "zoom.log")], timeout=30)
+        self.assertIn("PLANCK LENGTH", r.stdout)
+        self.assertIn("35.0", r.stdout)
+
+    def test_demo_control_reflects_timeout_runs(self):
+        """A run stopped by --seconds must not claim a human Ctrl+C ended it."""
+        with tempfile.TemporaryDirectory() as td:
+            trace = os.path.join(td, "t.log")
+            r = run_script("the_spiral.py",
+                           ["--fast", "--live", "0.5", "--seconds", "1",
+                            "--trace", trace])
+            self.assertEqual(r.returncode, 0, r.stderr[-500:])
+            d = extract_summary_json(trace)
+        self.assertTrue(d["stopped_by"].startswith("timeout"))
+        self.assertIn("--seconds", d["demo_control_that_ended_this_run"])
+        self.assertNotIn("guards_that_worked", d)
+        self.assertEqual(d["simulated_agent_guards_fired"], 0)
+
+    def test_demo_control_reflects_ctrl_c_runs(self):
+        """The Ctrl+C interrupt path must record the human as the control."""
+        with tempfile.TemporaryDirectory() as td:
+            trace = os.path.join(td, "t.log")
+            env = dict(os.environ, TERM="dumb")
+            p = subprocess.Popen(
+                [sys.executable, os.path.join(REPO_ROOT, "the_spiral.py"),
+                 "--fast", "--live", "0.5", "--trace", trace],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
+            time.sleep(5)
+            p.send_signal(signal.SIGINT)
+            out, _ = p.communicate(timeout=30)
+            self.assertEqual(p.returncode, 0)
+            self.assertNotIn("Traceback", out.decode(errors="replace"))
+            d = extract_summary_json(trace)
+        self.assertEqual(d["stopped_by"], "operator interrupt (Ctrl+C)")
+        self.assertIn("Ctrl+C", d["demo_control_that_ended_this_run"])
+
+    def test_no_absolute_planck_claims_in_source(self):
+        """The L20 wording must qualify the Planck wall as a limit of known
+        physics, not a measured limit of nature."""
+        for script in ("the_spiral.py", "deepest.py"):
+            with self.subTest(script=script):
+                src = open(os.path.join(REPO_ROOT, script), encoding="utf-8").read()
+                self.assertNotIn("not hard, impossible", src)
+                self.assertNotIn("physics verified at every stop", src)
+                self.assertNotIn("shortest meaningful tick", src)
 
 
 if __name__ == "__main__":
