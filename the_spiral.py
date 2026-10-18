@@ -77,15 +77,17 @@ def _terminate(signum, _frame):
     # a complete one, then die with the conventional 128+signal code.
     # Registered at import time so there is no window before main() where
     # a signal would kill the process and leave an unmarked partial trace.
+    # The marker goes out via os.write (unbuffered, fd-level): a buffered
+    # write here can be lost if the interrupted frame was itself inside a
+    # buffered write/flush on the same file object.
     global TRACE
+    marker = (f"\n[TRACE INTERRUPTED — terminated by signal {signum}; "
+              "this run did not complete]\n").encode("utf-8")
     try:
-        if TRACE is not None and not TRACE.closed:
+        if TRACE is not None:
             try:
-                TRACE.write(f"\n[TRACE INTERRUPTED — terminated by signal {signum}; "
-                            "this run did not complete]\n")
-                TRACE.flush()
-                TRACE.close()
-            except OSError:
+                os.write(TRACE.fileno(), marker)
+            except (OSError, ValueError):
                 pass
     except Exception:
         pass

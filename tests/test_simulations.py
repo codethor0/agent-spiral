@@ -345,11 +345,12 @@ class TestKnownBugs(unittest.TestCase):
                     p = subprocess.Popen(
                         [sys.executable, os.path.join(REPO_ROOT, "the_spiral.py"),
                          "--fast", "--live", "0.5", "--trace", trace],
-                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
                     time.sleep(4)
                     p.send_signal(sig)
-                    p.wait(timeout=30)
-                    self.assertEqual(p.returncode, rc_expected)
+                    _, err = p.communicate(timeout=30)
+                    self.assertEqual(p.returncode, rc_expected,
+                                     f"child stderr: {err.decode(errors='replace')[-300:]}")
                     with open(trace, encoding="utf-8", errors="replace") as f:
                         content = f.read()
                     self.assertIn("[TRACE INTERRUPTED", content)
