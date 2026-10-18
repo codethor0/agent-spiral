@@ -18,6 +18,7 @@ Planck-zoom animation reaching the wall inside the live window).
 import json
 import os
 import py_compile
+import re
 import signal
 import subprocess
 import sys
@@ -319,6 +320,40 @@ class TestKnownBugs(unittest.TestCase):
             src = f.read()
         self.assertNotIn("the only control that worked", src)
         self.assertIn("4/4 in field sessions", src)
+
+    def test_all_scripts_agree_on_version(self):
+        """The v1.1.5 release still displayed v1.1.4 banners (security audit
+        SEC-3). Every script must agree on one version string; bump both the
+        banners and EXPECTED below with each release."""
+        EXPECTED = "v1.1.6"
+        for script in ("the_spiral.py", "stuck_agent.py", "agent_stack_spiral.py",
+                       "deeper_than_this.py", "deepest.py"):
+            with self.subTest(script=script):
+                with open(os.path.join(REPO_ROOT, script), encoding="utf-8") as f:
+                    src = f.read()
+                found = set(re.findall(r"v\d+\.\d+\.\d+", src))
+                self.assertEqual(found, {EXPECTED},
+                                 f"{script} banners {found} != {EXPECTED}")
+
+    def test_sigterm_marks_trace_interrupted(self):
+        """SIGTERM/SIGHUP must leave a truncation marker in the trace so a
+        partial handoff can never be mistaken for a complete run (SEC-4)."""
+        for sig, rc_expected in ((signal.SIGTERM, 143), (signal.SIGHUP, 129)):
+            with self.subTest(signal=sig):
+                with tempfile.TemporaryDirectory() as td:
+                    trace = os.path.join(td, "t.log")
+                    p = subprocess.Popen(
+                        [sys.executable, os.path.join(REPO_ROOT, "the_spiral.py"),
+                         "--fast", "--live", "0.5", "--trace", trace],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    time.sleep(4)
+                    p.send_signal(sig)
+                    p.wait(timeout=30)
+                    self.assertEqual(p.returncode, rc_expected)
+                    with open(trace, encoding="utf-8", errors="replace") as f:
+                        content = f.read()
+                    self.assertIn("[TRACE INTERRUPTED", content)
+                    self.assertNotIn("SUMMARY (JSON)", content)
 
 
 if __name__ == "__main__":

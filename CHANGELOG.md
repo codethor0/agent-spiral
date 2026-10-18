@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+Security audit (branch security/audit-2026-10-18), Stage A read-only
+review plus surgical fixes; every fix has a regression test.
+
+- tools/render_demo.py: a cast file that is not valid UTF-8 or that carries
+  a non-numeric / NaN / Infinity timestamp now exits with a clear message
+  instead of an uncaught traceback (security audit SEC-1, SEC-2; found by
+  fuzzing the parser with random and adversarial bytes).
+- the_spiral.py: SIGTERM/SIGHUP mid-run previously killed the process and
+  left an incremental trace that looked like a complete handoff. The trace
+  now gets an explicit "[TRACE INTERRUPTED]" marker and the process exits
+  128+signal (security audit SEC-4). SIGINT behavior is unchanged.
+- Version banners and trace "simulation" fields in all five scripts bumped
+  to v1.1.6: the released v1.1.5 still displayed v1.1.4 (security audit
+  SEC-3). A test now fails if the scripts ever disagree on the version.
+- CI hardening: actions pinned to full commit SHAs (checkout v4.3.1,
+  setup-python v5.6.0), Pillow pinned (==10.4.0, the newest release
+  supporting the matrix's Python 3.8), and tests.yml declares
+  permissions: contents: read (security audit SEC-5, SEC-6).
+
+Decisions left to the owner (see PR body): --trace symlink policy
+(guard vs. document) and a tag-protection ruleset.
+
 ## 1.1.5 - 2026-10-18
 
 Audit rounds 4–6 (branch audit/v1.1.4-full-review), verified by an

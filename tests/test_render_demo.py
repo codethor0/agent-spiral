@@ -188,6 +188,42 @@ class TestRenderPipeline(unittest.TestCase):
             self.assertNotEqual(p.returncode, 0)
             self.assertIn("malformed cast header", p.stderr)
 
+    def test_invalid_utf8_cast_clean_error(self):
+        # security audit SEC-1: invalid UTF-8 used to die with an uncaught
+        # UnicodeDecodeError traceback; it must be a clean error message.
+        with tempfile.TemporaryDirectory() as td:
+            bad = os.path.join(td, "bad.cast")
+            with open(bad, "wb") as f:
+                f.write(b'{"version": 2, "width": 40, "height": 10}\n')
+                f.write(b'[0.1, "o", "bad \xff\xfe bytes"]\n')
+            p = subprocess.run(
+                [sys.executable, os.path.join(REPO_ROOT, "tools", "render_demo.py"),
+                 bad, os.path.join(td, "o.gif")],
+                capture_output=True, text=True)
+            self.assertEqual(p.returncode, 1)
+            self.assertIn("cannot decode", p.stderr)
+            self.assertNotIn("Traceback", p.stderr)
+
+    def test_bad_timestamps_rejected(self):
+        # security audit SEC-2: non-numeric / NaN / Infinity timestamps used
+        # to crash with a ValueError traceback (at parse or inside render()).
+        events = [("string", '["abc", "o", "x"]'), ("nan", '[NaN, "o", "x"]'),
+                  ("inf", '[Infinity, "o", "x"]')]
+        for name, line in events:
+            with self.subTest(timestamp=name):
+                with tempfile.TemporaryDirectory() as td:
+                    bad = os.path.join(td, "bad.cast")
+                    with open(bad, "w", encoding="utf-8") as f:
+                        f.write('{"version": 2, "width": 40, "height": 10}\n')
+                        f.write(line + "\n")
+                    p = subprocess.run(
+                        [sys.executable, os.path.join(REPO_ROOT, "tools", "render_demo.py"),
+                         bad, os.path.join(td, "o.gif")],
+                        capture_output=True, text=True)
+                    self.assertEqual(p.returncode, 1, p.stderr)
+                    self.assertIn("timestamp", p.stderr)
+                    self.assertNotIn("Traceback", p.stderr)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

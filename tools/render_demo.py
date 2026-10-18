@@ -13,6 +13,7 @@ Dependency: Pillow (only this tool, not the simulations).
 """
 
 import json
+import math
 import os
 import sys
 
@@ -260,6 +261,8 @@ def main():
     font_path = sys.argv[3] if len(sys.argv) > 3 else default_font()
     try:
         lines = open(cast_path, encoding="utf-8").read().splitlines()
+    except UnicodeDecodeError as e:
+        sys.exit(f"cannot decode {cast_path} as UTF-8: {e}")
     except OSError as e:
         sys.exit(f"cannot read {cast_path}: {e}")
     try:
@@ -279,10 +282,16 @@ def main():
             sys.exit(f"malformed cast event line {n} in {cast_path}: {e}")
         if ev != "o":
             continue   # input, markers, resize: not terminal output
+        try:
+            t = float(t)
+        except (TypeError, ValueError):
+            sys.exit(f"malformed timestamp on cast line {n} in {cast_path}: {t!r}")
+        if not math.isfinite(t):
+            sys.exit(f"non-finite timestamp on cast line {n} in {cast_path}: {t}")
         term.feed(data)
-        final_t = max(final_t, float(t))
+        final_t = max(final_t, t)
         if t - last_t >= 0.12:
-            samples.append((float(t), term.snapshot()))
+            samples.append((t, term.snapshot()))
             last_t = t
     # always include the true final terminal state, even on a short cast
     samples.append((max(final_t, samples[-1][0] if samples else 0.0),
