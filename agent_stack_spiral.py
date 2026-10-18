@@ -127,12 +127,8 @@ def layer_tokenizer(args):
     header("LAYER 1 · TOKENIZER — text stops being text")
     pause(args, 0.5)
     emit(f"  {col.DIM}BPE: split into subword units. words you recognize become integers a GPU can eat.{col.END}")
-    parts = re.findall(r"\w+|[^\w\s]|\s+", args.question)
-    toks = []
-    for p in parts:
-        if p.isspace():
-            continue
-        toks.append(p if p.startswith(" ") else p)
+    parts = re.findall(r"\w+|[^\w\s]", args.question)
+    toks = parts  # whitespace already excluded by the pattern
     ids = [stable_id(t) for t in toks]
     pause(args, 0.4)
     shown = toks[:14]
@@ -347,7 +343,7 @@ def postmortem(args, st):
     emit(f"  {col.DIM}the spiral lives in the gap between 'no layer failed' and 'nobody stopped it'.{col.END}")
 
     summary = {
-        "simulation": "agent-stack-spiral v1.1.3",
+        "simulation": "agent-stack-spiral v1.1.4",
         "question": args.question,
         "stopped_by": st["stopped"],
         "seconds": round(st["secs"], 1),
@@ -425,7 +421,7 @@ def main():
     TRACE.flush()
 
     print()
-    emit(f"{col.BOLD}  ⚡ AGENT STACK SPIRAL {col.DIM}v1.1.3 — descent into an agent that never comes back{col.END}")
+    emit(f"{col.BOLD}  ⚡ AGENT STACK SPIRAL {col.DIM}v1.1.4 — descent into an agent that never comes back{col.END}")
     emit(f"  question: {col.CYAN}\"{safe_text(args.question)}\"{col.END}")
 
     st = dict(secs=0.0, generated=0, ctx=0, flops=0.0, energy_wh=0.0, cost=0.0,

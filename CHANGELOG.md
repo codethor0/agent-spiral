@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.1.4 - 2026-10-18
+
+Third review round, verified by a new automated test suite.
+
+- Fix the L20 Planck-wall zoom animation in the_spiral.py and deepest.py:
+  the exponent now tracks elapsed time instead of a fixed per-iteration
+  decrement, so the zoom actually reaches 10^-35 m inside the live window
+  (previously it needed ~64 s and stalled around 10^3 at the default --live 6;
+  the PLANCK LENGTH label and the early break were unreachable). Also removes
+  the dead label loop and the always-1.0 (run_for / max(run_for, 1))
+  multiplier in deepest.py.
+- Remove dead code: unused charge/hi in deeper_than_this.py L12, unused
+  attempts counter in the_spiral.py L16, unused ZOOM global in deepest.py,
+  unused coherent_seen flag in stuck_agent.py, and a no-op conditional in
+  the agent_stack_spiral.py tokenizer.
+- Add tests/test_simulations.py: 18 stdlib-only tests covering compile
+  sanity, bounded runs of all five scripts, trace JSON validity, argument
+  validation exit codes, broken-pipe / closed-stdout behavior, and Ctrl+C
+  reporting.
+- Re-record tools/demo.cast and re-render docs/demo.gif from the fixed
+  simulation; scrub the recording shell notice and prompt. Regenerate
+  traces/sample-trace.log at v1.1.4.
+- Version bump to v1.1.4 across all banners and trace summaries.
+
 ## 1.1.3 - 2026-10-16
 
 Second adversarial review round: 17 findings, all fixed.

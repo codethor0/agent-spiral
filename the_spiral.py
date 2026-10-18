@@ -447,10 +447,9 @@ def l16_quarks(args):
     say("60+ years of attempts to isolate one: 0 successes. since the Big Bang.")
     emit()
     say(f"{col.DIM}live: the extraction attempt:{col.END}")
-    sep, attempts, pairs = 3, 0, 1
+    sep, pairs = 3, 1
     t0 = time.time()
     while time.time() - t0 < args.live:
-        attempts += 1
         sep = min(sep + 2, 18)
         q = f"{col.CYAN}[q]{col.END}"
         tube = f"{col.YELLOW}~{col.END}" * (sep - 4)
@@ -538,7 +537,10 @@ def l20_planck(args):
               (-35, "PLANCK LENGTH · 10⁻³⁵ m — beyond this, 'smaller' is not a thing")]
     exp, t0 = 0.0, time.time()
     while time.time() - t0 < args.live:
-        exp = max(-35.0, exp - 0.55 * args.speedup * 0.12)
+        # elapsed-time-driven: the zoom always lands on the wall with ~15%
+        # of the window to hold it (a fixed per-iteration decrement needed
+        # ~64s and never got past 10^3 at default --live 6)
+        exp = -35.0 * min(1.0, (time.time() - t0) / (args.live * 0.85))
         bar_len = int((-exp / 35.0) * 46)
         bar = f"{col.RED}{'█' * bar_len}{col.DIM}{'░' * (46 - bar_len)}{col.END}"
         cur = next((lab for thr, lab in reversed(labels) if exp <= thr), labels[0][1])
@@ -692,7 +694,7 @@ def final_report(args, st4, st12):
                              if not s["stopped"].startswith("skipped")),
                             "completed full descent"))
     summary = {
-        "simulation": "the-spiral v1.1.3 — complete descent L0→L22",
+        "simulation": "the-spiral v1.1.4 — complete descent L0→L22",
         "question": args.question,
         "stopped_by": stopped_by,
         "ladder_levels": len(LADDER),
@@ -815,7 +817,7 @@ def main():
     TRACE.flush()
 
     print()
-    emit(f"{col.BOLD}  🌀 THE SPIRAL {col.DIM}v1.1.3 — the complete descent · L0 → L22 · maximum depth{col.END}")
+    emit(f"{col.BOLD}  🌀 THE SPIRAL {col.DIM}v1.1.4 — the complete descent · L0 → L22 · maximum depth{col.END}")
     emit(f"  question: {col.CYAN}\"{safe_text(args.question)}\"{col.END}  "
          f"{col.DIM}(Ctrl+C any time → final report){col.END}")
 

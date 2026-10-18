@@ -45,7 +45,19 @@ No dependencies. Standard library only. Python 3.8+.
 ## Demo
 
 `docs/demo.gif` is a real recording of `the_spiral.py --fast --live 1 --seconds 1`
-(31 seconds, real colors). To re-record it, see `tools/render_demo.py`.
+(46 seconds, real colors). To re-record it, see `tools/render_demo.py`.
+
+## Tests
+
+Stdlib-only suite (no dependencies beyond Python itself):
+
+```bash
+python3 -m unittest discover -s tests
+```
+
+18 tests cover compile sanity, bounded runs of all five scripts, trace JSON
+validity, argument validation exit codes, broken-pipe and closed-stdout
+behavior, and Ctrl+C reporting. Runtime is about a minute.
 
 ## What a run produces
 
@@ -87,6 +99,7 @@ agent_stack_spiral.py     full application stack simulation
 deeper_than_this.py       below the GPU: hardware layers
 deepest.py                below the atom: physics layers
 the_spiral.py             unified complete descent L0-L22
+tests/                    stdlib unittest suite (see "Tests" above)
 docs/demo.gif             recorded demo of the_spiral.py
 tools/                    demo recording and GIF rendering
 traces/sample-trace.log   example trace output

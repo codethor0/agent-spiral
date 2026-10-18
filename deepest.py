@@ -83,9 +83,6 @@ def say(s):
     emit(f"│  {s}")
 
 
-ZOOM = {"m": 1.0}  # cumulative zoom tracker (meters scale)
-
-
 # ────────────────────────────────────────────────────────────────────────────
 # L15 — the nucleus
 # ────────────────────────────────────────────────────────────────────────────
@@ -320,13 +317,10 @@ def l20_planck(args):
     t0 = time.time()
     run_for = args.demo_seconds
     exp = 0.0
-    last_lab = -1
     while time.time() - t0 < run_for:
-        exp -= 0.55 * args.speedup * 0.12 * (run_for / max(run_for, 1))
-        exp = max(-35.0, exp)
-        for thr, lab in labels:
-            if int(exp) <= thr and last_lab > thr or (last_lab == -1 and thr == 0):
-                pass
+        # elapsed-time-driven so the zoom always reaches the wall inside the
+        # demo window (a fixed per-iteration decrement needed ~64s at 1x)
+        exp = -35.0 * min(1.0, (time.time() - t0) / (run_for * 0.85))
         bar_len = int((-exp / 35.0) * 46)
         bar = f"{col.RED}{'█' * bar_len}{col.DIM}{'░' * (46 - bar_len)}{col.END}"
         cur = next((lab for thr, lab in reversed(labels) if exp <= thr), labels[0][1])
@@ -408,7 +402,7 @@ def final_report(args, stopped_by="completed full descent"):
     emit()
 
     summary = {
-        "simulation": "deepest v1.1.3",
+        "simulation": "deepest v1.1.4",
         "stopped_by": stopped_by,
         "levels": ["nucleus", "quarks_confinement", "standard_model", "quantum_fields",
                    "measurement_problem", "planck_wall", "edge_unknowns"],
@@ -468,7 +462,7 @@ def main():
     args.speedup = 4.0 if args.fast else 1.0
 
     print()
-    emit(f"{col.BOLD}  🕳 DEEPEST {col.DIM}v1.1.3 — you asked 'can we go deeper than this?'")
+    emit(f"{col.BOLD}  🕳 DEEPEST {col.DIM}v1.1.4 — you asked 'can we go deeper than this?'")
     emit(f"  L14 said 'fields, then nobody knows.' let's find out where nobody knows ends.{col.END}")
 
     stopped_by = "completed full descent"

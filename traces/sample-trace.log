@@ -1,6 +1,6 @@
 THE-SPIRAL COMPLETE TRACE
 ================================================================
-  🌀 THE SPIRAL v1.1.3 — the complete descent · L0 → L22 · maximum depth
+  🌀 THE SPIRAL v1.1.4 — the complete descent · L0 → L22 · maximum depth
   question: "why did production go down last night?"  (Ctrl+C any time → final report)
 
 ┌─ L0 · THE WIRE — where your words physically go ──────────────────────────────────────────
@@ -76,7 +76,7 @@ THE-SPIRAL COMPLETE TRACE
 
 │  ── status ── gen=126 · ctx=134 · KV=0.02 GiB · 189 tok/s
 │     eos p ≈ 0.0003 (never rises) · 4-gram peak "… actually— hold" ×3 → penalty=1.0
-│     GPU util 97% (working perfectly) · energy 0.17 Wh · bill $0.0005
+│     GPU util 97% (working perfectly) · energy 0.16 Wh · bill $0.0005
 │  ⠿ stream: "…old on what if the premise is wrong?wait, let me reconsider that"
 │  ⠿ stream: "…se is wrong?wait, let me reconsider that… actually— hold on what"
 │  ⠿ stream: "…reconsider that… actually— hold on what if the premise is wrong?"
@@ -109,7 +109,7 @@ THE-SPIRAL COMPLETE TRACE
 │  one token = 3,906,250 MMAs. pure math ~15µs; real decode 4.8 ms — bandwidth-bound, not compute-bound.
 
 │  live ticker — 'stuck' from inside the die:
-│  the die produced ~16.2 GFLOP of flawless, useless math.
+│  the die produced ~8.1 GFLOP of flawless, useless math.
 │  nothing above the MMA knows it's wasted. nothing below knows there was a question.
 
 ┌─ L9 · THE NUMBER — one weight, literally ─────────────────────────────────────────────────
@@ -135,7 +135,7 @@ THE-SPIRAL COMPLETE TRACE
 │  re-poured forever so the agent's circling never forgets itself.
 
 │  live: a few of the buckets, refreshing:
-│  14 refreshes of work that produced nothing.
+│  7 refreshes of work that produced nothing.
 │  forgetting is expensive. the machine pays continuously so the loop never does.
 
 ┌─ L12 · THE TRANSISTOR — 80 billion switches, one pattern ─────────────────────────────────
@@ -151,7 +151,7 @@ THE-SPIRAL COMPLETE TRACE
 │  dope silicon: phosphorus → extra electrons (N), boron → holes (P). their
 │  junction + a gate field = the transistor. electrons drift at cm/s —
 │  slower than a garden snail. the speed is a stadium wave, not a sprint.
-│  in 1.0s, ~5.3e+12 field-pushes obeyed Maxwell,
+│  in 1.0s, ~5.4e+12 field-pushes obeyed Maxwell,
 │  carrying 16-bit patterns that mean 'wait, let me reconsider'. physics complied.
 
 ┌─ L14 · THE MACHINE'S BOTTOM — atoms. then fields. then nothing to stand on ───────────────
@@ -169,7 +169,7 @@ THE-SPIRAL COMPLETE TRACE
 │  atom = the stadium. the 'solid' silicon was a force scaffold.
 
 │  live: alphas crossing the foil:
-│  192 through · 0 back — matter is 99.9999999% empty.
+│  96 through · 0 back — matter is 99.9999999% empty.
 
 ┌─ L16 · QUARKS — confinement: a prison with no outside ────────────────────────────────────
 │  strong force grows with distance — the only one that does
@@ -178,7 +178,7 @@ THE-SPIRAL COMPLETE TRACE
 │  60+ years of attempts to isolate one: 0 successes. since the Big Bang.
 
 │  live: the extraction attempt:
-│  pairs created: 4 · quarks isolated: 0
+│  pairs created: 2 · quarks isolated: 0
 │  the universe's first stuck loop: quarks in confinement, 13.8 Gyr,
 │  no Ctrl+C. your agent's 90 seconds: rookie numbers.
 
@@ -253,8 +253,8 @@ THE-SPIRAL COMPLETE TRACE
   FINAL REPORT — THE COMPLETE DESCENT · L0 → L22 · MAXIMUM DEPTH REACHED
   ════════════════════════════════════════════════════════════════════════════
 
-  runtime             : 0:00:11
-  tokens generated    : 147 (answer produced: NO) · switch-cycles: 66
+  runtime             : 0:00:08
+  tokens generated    : 149 (answer produced: NO) · switch-cycles: 68
   zoom                : ×10³³ — from keycap to the planck wall
 
   the ladder:
@@ -335,7 +335,7 @@ THE-SPIRAL COMPLETE TRACE
 ================================================================
 SUMMARY (JSON)
 {
-  "simulation": "the-spiral v1.1.3 \u2014 complete descent L0\u2192L22",
+  "simulation": "the-spiral v1.1.4 \u2014 complete descent L0\u2192L22",
   "question": "why did production go down last night?",
   "stopped_by": "timeout (1s) \u2014 still decoding",
   "ladder_levels": 23,
@@ -456,9 +456,9 @@ SUMMARY (JSON)
       "what": "hypotheses with no floor yet"
     }
   },
-  "tokens_generated": 147,
+  "tokens_generated": 149,
   "answer_produced": false,
-  "switch_cycles": 66,
+  "switch_cycles": 68,
   "total_zoom": "1e33 (keycap to planck)",
   "guard_map": [
     {

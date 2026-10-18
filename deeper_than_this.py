@@ -293,8 +293,6 @@ def l12_transistor(args):
     say(f"{col.DIM}this is 'the agent thinking', one level above the metal:{col.END}")
     emit()
 
-    charge = ["·"] * 22
-    hi = list(range(0, 22, 4))
     t0 = time.time()
     cycles = 0
     colons = 0
@@ -403,7 +401,7 @@ def descent_report(args, st):
     emit()
 
     summary = {
-        "simulation": "deeper-than-this v1.1.3",
+        "simulation": "deeper-than-this v1.1.4",
         "stopped_by": st["stopped"],
         "levels": ["orchestrator", "cuda_kernel", "tensor_core", "fp16_number",
                    "memory_hierarchy", "dram_cell", "transistor", "silicon_electrons", "bottom_fields"],
@@ -481,7 +479,7 @@ def main():
     args.speedup = 4.0 if args.fast else 1.0
 
     print()
-    emit(f"{col.BOLD}  🔻 DEEPER THAN THIS {col.DIM}v1.1.3 — stack_spiral ended at the GPU. that was the foyer.{col.END}")
+    emit(f"{col.BOLD}  🔻 DEEPER THAN THIS {col.DIM}v1.1.4 — stack_spiral ended at the GPU. that was the foyer.{col.END}")
     emit(f"  {col.DIM}same question riding all the way down: \"why did production go down?\"{col.END}")
 
     st = dict(cycles=0, secs=0.0, stopped="operator interrupt (Ctrl+C)")

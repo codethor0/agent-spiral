@@ -22,6 +22,7 @@ this from the repo root and paste the results into the PR:
 
 ```bash
 python3 -m py_compile *.py tools/render_demo.py
+python3 -m unittest discover -s tests
 python3 stuck_agent.py --fast --seconds 1
 python3 agent_stack_spiral.py --fast --seconds 1
 python3 deeper_than_this.py --fast --seconds 1

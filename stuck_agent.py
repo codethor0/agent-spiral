@@ -123,7 +123,6 @@ def run(args):
         "tokens": 0,
         "cycle": 0,
         "counter": Counter(),
-        "coherent_seen": False,
         "ctx_full_announced": False,
         "t0": time.time(),
         "stopped": "operator interrupt (Ctrl+C)",
@@ -153,7 +152,7 @@ def run(args):
         try:
             # ---- boot sequence (Ctrl+C here still gets the post-mortem) ----
             print()
-            print(f"{col.BOLD}  🧠 stuck-agent simulation {col.DIM}v1.1.3{col.END}")
+            print(f"{col.BOLD}  🧠 stuck-agent simulation {col.DIM}v1.1.4{col.END}")
             print(f"  question: {col.CYAN}\"{q}\"{col.END}")
             print()
             for line in BOOT:
@@ -178,7 +177,6 @@ def run(args):
                 if state["n"] <= len(COHERENT):
                     text = COHERENT[state["n"] - 1]
                 else:
-                    state["coherent_seen"] = True
                     t = random.choice(LOOP_TEMPLATES)
                     if "{n}" in t:
                         # cap the embedded counter so the repetition table stays
@@ -260,7 +258,7 @@ def postmortem(state, args, emit, trace):
 
     # ---- trace summary: commit despite a stray Ctrl+C during the write ----
     summary = {
-        "simulation": "stuck-agent v1.1.3",
+        "simulation": "stuck-agent v1.1.4",
         "question": args.question,
         "stopped_by": state["stopped"],
         "seconds": round(elapsed, 1),
