@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.1.5 - 2026-10-18
 
-Fourth audit round (branch audit/v1.1.4-full-review), verified by an
+Audit rounds 4–6 (branch audit/v1.1.4-full-review), verified by an
 expanded automated suite.
 
 - the_spiral.py: the trace summary no longer reports human Ctrl+C
@@ -59,7 +59,13 @@ expanded automated suite.
   Python 3.9-3.13, on push and pull request. CI installs Pillow so the
   renderer tests execute instead of skipping; 3.8 added to the matrix to
   match the advertised Python 3.8+ support.
-- Suite is now 51 tests; docs/demo.gif re-recorded after the L20 note.
+- Suite is now 53 tests; docs/demo.gif re-recorded after the L20 note and
+  again after the guard-map wording change, with the final-report frames
+  machine-verified against the current output.
+- Fix flaky kv_cache_gib assertion in test_stack_spiral_seconds: the
+  expected value is recomputed from the reported final_context_tokens
+  instead of asserting > 0, so lightly loaded CI runners (where the value
+  rounds to 0.00) no longer fail the job.
 
 ## 1.1.4 - 2026-10-18
 
