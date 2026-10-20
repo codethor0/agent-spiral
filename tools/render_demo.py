@@ -33,6 +33,36 @@ BRIGHT = {
 BASE_BG = {code + 10: rgb for code, rgb in BASE.items()}
 BRIGHT_BG = {code + 10: rgb for code, rgb in BRIGHT.items()}
 
+# Resource budgets and parser policy (security audit round 9, AS-02/03/04).
+# A demo recording is ~130 KB / ~50 s; the budgets below are hundreds of
+# times larger than any legitimate cast, and every over-budget input gets a
+# clean error instead of unbounded work.
+MAX_INPUT_BYTES = 32 * 1024 * 1024      # whole cast file
+MAX_LINE_BYTES = 1024 * 1024            # one event line (escape-sequence bomb)
+MAX_EVENTS = 500_000                    # event lines
+MAX_CELLS = 100_000                     # terminal grid cells (per snapshot)
+MAX_SAMPLES = 20_000                    # retained snapshots
+# Cell-snapshots bound the parser's real memory amplifier (every snapshot is
+# a full grid copy): 4M cell-snapshots ~= 280 MB of tuples worst case, and
+# the shipped demo itself is ~1.3M.
+MAX_CELLS_TOTAL = 4_000_000
+# Timestamp domain: recordings are minutes; one year is generous. Enforcing
+# it at parse time keeps derived frame-delay arithmetic (hold * 1000) far
+# from float overflow (1e308-style timestamps, AS-03).
+MAX_TIMESTAMP = 31_536_000.0            # 365 days, seconds
+# A single CSI parameter carries at most 19 digits: larger values are
+# clamped by the cursor-move bounds anyway, and 4300+-digit strings trip
+# Python's int-conversion safeguard (ValueError mid-parse, AS-02). A
+# parameter string longer than this makes the WHOLE sequence ignored.
+MAX_CSI_PARAM_DIGITS = 19
+MAX_CSI_RAW = 256
+# An escape sequence split across feed() chunks is held in `pending`; cap it
+# so a never-terminating CSI/OSC stream can't grow parser state without
+# bound. The cap is dropped (the sequence is abandoned), which is safe: all
+# bytes inside an unterminated CSI/OSC are parameter payload, never
+# renderable text.
+MAX_PENDING = 4096
+
 
 class Term:
     def __init__(self, cols, rows):
@@ -109,6 +139,18 @@ class Term:
                      for _ in range(self.rows)]
         self.r = self.c = 0
 
+    def _hold(self, seq):
+        # Buffer an incomplete escape sequence across feed() calls, but only
+        # up to MAX_PENDING bytes — an unterminated CSI/OSC stream must not
+        # grow parser state without bound (AS-02). When the cap drops payload
+        # bytes, keep the ESC + introducer so the sequence still completes
+        # (and is then ignored as over-long) instead of leaking its tail
+        # bytes onto the screen as plain text.
+        if len(seq) > MAX_PENDING:
+            self.pending = seq[:2] + seq[-(MAX_PENDING - 2):]
+        else:
+            self.pending = seq
+
     def feed(self, text):
         # re-attach an escape sequence split across feed() calls
         text = self.pending + text
@@ -122,13 +164,19 @@ class Term:
                 while j < n and not ("@" <= text[j] <= "~"):
                     j += 1
                 if j >= n:
-                    self.pending = text[i:]
+                    self._hold(text[i:])
                     break
                 raw = text[i + 2:j]
                 fin = text[j]
-                # unknown/non-numeric parameters (e.g. ESC[!p) degrade to 0
-                params = [int(x) if x.isdigit() else 0
-                          for x in raw.replace("?", "").split(";")] if raw else [0]
+                if len(raw) > MAX_CSI_RAW:
+                    # oversized parameter string: consume the sequence but
+                    # apply nothing (parser policy, AS-02)
+                    i = j + 1
+                    continue
+                # unknown/non-numeric/over-long parameters (e.g. ESC[!p)
+                # degrade to 0; >19-digit strings never reach int() (AS-02)
+                params = [int(x) if x.isdigit() and len(x) <= MAX_CSI_PARAM_DIGITS
+                          else 0 for x in raw.replace("?", "").split(";")] if raw else [0]
                 if fin == "m":
                     self.sgr(params)
                 elif fin == "K":
@@ -152,7 +200,7 @@ class Term:
                 if j < 0:
                     # unterminated: keep the WHOLE OSC (not just the tail)
                     # so a terminator split across chunks is reassembled
-                    self.pending = text[i:]
+                    self._hold(text[i:])
                     break
                 if j == esc:
                     if j + 1 < n and text[j + 1] == "\\":
@@ -161,7 +209,7 @@ class Term:
                     if j + 1 >= n:
                         # ESC is the last byte: it may be the first half of
                         # an ST split across chunks — wait for more input
-                        self.pending = text[i:]
+                        self._hold(text[i:])
                         break
                     i = j  # a different sequence: reprocess from the ESC
                     continue
@@ -169,7 +217,7 @@ class Term:
                 continue
             if ch == "\x1b":
                 if i + 1 >= n:
-                    self.pending = text[i:]  # lone ESC at chunk end
+                    self._hold(text[i:])  # lone ESC at chunk end
                     break
                 i += 1  # unsupported two-byte sequence: drop the ESC
                 continue
@@ -202,9 +250,11 @@ def render(samples, out_path, font_path, cell_w=9, cell_h=18, font_px=14):
     # merge consecutive identical screens (full state: chars + colors + bold)
     screens = []  # [snapshot, total_ms]
     for (_, snap), hold in zip(samples, holds):
-        # GIF frame delays are 16-bit; clamp pathological holds (e.g. a
-        # hostile cast with a years-long final gap) instead of erroring
-        ms = min(max(int(hold * 1000), 20), 600_000)
+        # GIF frame delays are 16-bit; clamp the hold to the documented
+        # 0.02s..600s window BEFORE int() so extreme (or, defense in depth,
+        # non-finite) floats can never overflow the conversion (AS-03)
+        ms = int(min(max(hold, 0.0), 600.0) * 1000)
+        ms = min(max(ms, 20), 600_000)
         if screens and screens[-1][0] == snap:
             screens[-1][1] += ms
         else:
@@ -262,58 +312,98 @@ def main():
     cast_path, out_path = sys.argv[1], sys.argv[2]
     font_path = sys.argv[3] if len(sys.argv) > 3 else default_font()
     try:
-        lines = open(cast_path, encoding="utf-8").read().splitlines()
+        if os.path.getsize(cast_path) > MAX_INPUT_BYTES:
+            sys.exit(f"cast file too large in {cast_path}: over "
+                     f"{MAX_INPUT_BYTES} bytes (resource budget, AS-04)")
+        cast = open(cast_path, encoding="utf-8")
     except UnicodeDecodeError as e:
         sys.exit(f"cannot decode {cast_path} as UTF-8: {e}")
     except OSError as e:
         sys.exit(f"cannot read {cast_path}: {e}")
-    try:
-        hdr = json.loads(lines[0])
-    except (IndexError, ValueError) as e:
-        sys.exit(f"malformed cast header in {cast_path}: {e}")
-    if not isinstance(hdr, dict):
-        sys.exit(f"malformed cast header in {cast_path}: not a JSON object")
-    try:
-        cols, rows = hdr["width"], hdr["height"]
-    except KeyError as e:
-        sys.exit(f"malformed cast header in {cast_path}: missing {e}")
-    # A terminal grid is allocated per event snapshot, so hostile dimensions
-    # are the renderer's main memory/CPU amplifier: a 44-byte cast claiming
-    # 100000x100000 cells never finishes. Require true integers and bound
-    # the total grid (the largest realistic recordings are ~300x100).
-    MAX_CELLS = 100_000
-    if (isinstance(cols, bool) or isinstance(rows, bool)
-            or not isinstance(cols, int) or not isinstance(rows, int)
-            or cols < 1 or rows < 1 or cols * rows > MAX_CELLS):
-        sys.exit(f"malformed cast header in {cast_path}: width/height must be "
-                 f"positive integers totaling at most {MAX_CELLS} cells, "
-                 f"got {cols!r} x {rows!r}")
-    term = Term(cols, rows)
-    samples = []   # (timestamp, snapshot)
-    last_t, final_t = 0.0, 0.0
-    for n, line in enumerate(lines[1:], 2):
-        if not line.strip():
-            continue
+    with cast:
         try:
-            t, ev, data = json.loads(line)
+            header_line = cast.readline()
+        except UnicodeDecodeError as e:
+            sys.exit(f"cannot decode {cast_path} as UTF-8: {e}")
+        try:
+            hdr = json.loads(header_line)
         except ValueError as e:
-            sys.exit(f"malformed cast event line {n} in {cast_path}: {e}")
-        if ev != "o":
-            continue   # input, markers, resize: not terminal output
+            sys.exit(f"malformed cast header in {cast_path}: {e}")
+        if not isinstance(hdr, dict):
+            sys.exit(f"malformed cast header in {cast_path}: not a JSON object")
         try:
-            t = float(t)
-        except (TypeError, ValueError):
-            sys.exit(f"malformed timestamp on cast line {n} in {cast_path}: {t!r}")
-        if not math.isfinite(t):
-            sys.exit(f"non-finite timestamp on cast line {n} in {cast_path}: {t}")
-        if not isinstance(data, str):
-            sys.exit(f"malformed event data on cast line {n} in {cast_path}: "
-                     f"expected string, got {type(data).__name__}")
-        term.feed(data)
-        final_t = max(final_t, t)
-        if t - last_t >= 0.12:
-            samples.append((t, term.snapshot()))
-            last_t = t
+            cols, rows = hdr["width"], hdr["height"]
+        except KeyError as e:
+            sys.exit(f"malformed cast header in {cast_path}: missing {e}")
+        # A terminal grid is allocated per event snapshot, so hostile
+        # dimensions are the renderer's main memory/CPU amplifier: a 44-byte
+        # cast claiming 100000x100000 cells never finishes. Require true
+        # integers and bound the total grid (the largest realistic
+        # recordings are ~300x100).
+        if (isinstance(cols, bool) or isinstance(rows, bool)
+                or not isinstance(cols, int) or not isinstance(rows, int)
+                or cols < 1 or rows < 1 or cols * rows > MAX_CELLS):
+            sys.exit(f"malformed cast header in {cast_path}: width/height must be "
+                     f"positive integers totaling at most {MAX_CELLS} cells, "
+                     f"got {cols!r} x {rows!r}")
+        term = Term(cols, rows)
+        samples = []   # (timestamp, snapshot)
+        last_t, prev_t, final_t, n_events = 0.0, 0.0, 0.0, 0
+        for n, line in enumerate(cast, 2):
+            if len(line.encode("utf-8", "ignore")) > MAX_LINE_BYTES:
+                sys.exit(f"cast line {n} in {cast_path} exceeds the "
+                         f"{MAX_LINE_BYTES}-byte event budget (AS-04)")
+            if not line.strip():
+                continue
+            try:
+                event = json.loads(line)
+            except ValueError as e:
+                sys.exit(f"malformed cast event line {n} in {cast_path}: {e}")
+            # AS-01: validate the event's structure and field types before
+            # unpacking — JSON scalars (null/true/numbers/strings) used to
+            # raise an uncaught TypeError here.
+            if not isinstance(event, list) or len(event) != 3:
+                sys.exit(f"malformed cast event line {n} in {cast_path}: "
+                         f"expected [time, type, data], got {event!r:.200}")
+            t, ev, data = event
+            if isinstance(t, bool) or not isinstance(t, (int, float)):
+                sys.exit(f"malformed timestamp on cast line {n} in {cast_path}: {t!r}")
+            if not math.isfinite(t):
+                sys.exit(f"non-finite timestamp on cast line {n} in {cast_path}: {t}")
+            # AS-03: documented timestamp domain — finite, non-negative, at
+            # most one year, and non-decreasing (asciicast v2 ordering).
+            if not 0.0 <= t <= MAX_TIMESTAMP:
+                sys.exit(f"timestamp out of range on cast line {n} in {cast_path}: "
+                         f"{t} (allowed 0..{MAX_TIMESTAMP:.0f})")
+            if t < prev_t:
+                sys.exit(f"timestamp out of order on cast line {n} in {cast_path}: "
+                         f"{t} after {prev_t}")
+            prev_t = t
+            if not isinstance(ev, str):
+                sys.exit(f"malformed event code on cast line {n} in {cast_path}: "
+                         f"expected string, got {type(ev).__name__}")
+            if ev != "o":
+                continue   # input, markers, resize: not terminal output
+            if not isinstance(data, str):
+                sys.exit(f"malformed event data on cast line {n} in {cast_path}: "
+                         f"expected string, got {type(data).__name__}")
+            n_events += 1
+            if n_events > MAX_EVENTS:
+                sys.exit(f"cast event budget exceeded in {cast_path}: over "
+                         f"{MAX_EVENTS} output events (AS-04)")
+            term.feed(data)
+            final_t = max(final_t, t)
+            if t - last_t >= 0.12:
+                # AS-04: snapshots are full grid copies; cap both their count
+                # and the total retained cells so hostile casts get a clean
+                # error instead of unbounded memory.
+                if (len(samples) >= MAX_SAMPLES
+                        or (len(samples) + 1) * cols * rows > MAX_CELLS_TOTAL):
+                    sys.exit(f"cast exceeds the supported rendering workload in "
+                             f"{cast_path}: over {MAX_SAMPLES} frames or "
+                             f"{MAX_CELLS_TOTAL} cell-frames (AS-04)")
+                samples.append((t, term.snapshot()))
+                last_t = t
     # always include the true final terminal state, even on a short cast
     samples.append((max(final_t, samples[-1][0] if samples else 0.0),
                     term.snapshot()))
