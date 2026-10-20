@@ -834,7 +834,16 @@ def open_trace(path):
     flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NONBLOCK
     if hasattr(os, "O_NOFOLLOW"):  # POSIX; absent on Windows (documented)
         flags |= os.O_NOFOLLOW
-    fd = os.open(path, flags, 0o666)
+    try:
+        fd = os.open(path, flags, 0o666)
+    except OSError as e:
+        # O_NONBLOCK write-open of a FIFO with no reader fails ENXIO
+        # (wording varies by platform); report it as the same special-file
+        # refusal the fstat check below produces for an opened fifo.
+        if e.errno == errno.ENXIO:
+            raise OSError(errno.EINVAL,
+                          f"trace path is not a regular file: {path}") from e
+        raise
     try:
         # O_NONBLOCK keeps a FIFO from blocking the open while we inspect
         # it; anything that is not a regular file is refused below, and

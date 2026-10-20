@@ -400,12 +400,11 @@ class TestTracePathGuards(unittest.TestCase):
                            ["--fast", "--live", "0.2", "--seconds", "1",
                             "--trace", fifo], timeout=60)
             self.assertEqual(r.returncode, 1, r.stdout[-300:] + r.stderr[-300:])
-            # macOS refuses the O_NONBLOCK open with ENXIO ("Device not
-            # configured"); Linux opens the fifo and the fstat check refuses
-            # it as "not a regular file". Either way: refused, no hang.
-            self.assertTrue(
-                "not a regular file" in r.stdout + r.stderr
-                or "configured" in r.stdout + r.stderr)
+            # both refusal paths surface one platform-independent message:
+            # macOS fails the O_NONBLOCK open with ENXIO, Linux opens the
+            # fifo and the fstat check refuses it — either way, no hang.
+            self.assertIn("not a regular file", r.stdout + r.stderr)
+            self.assertTrue(os.path.exists(fifo))  # fifo not replaced
 
     def test_trace_directory_refused(self):
         with tempfile.TemporaryDirectory() as td:
