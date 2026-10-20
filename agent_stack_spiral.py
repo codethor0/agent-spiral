@@ -349,7 +349,7 @@ def postmortem(args, st):
     emit(f"  {col.DIM}the spiral lives in the gap between 'no layer failed' and 'nobody stopped it'.{col.END}")
 
     summary = {
-        "simulation": "agent-stack-spiral v1.1.6",
+        "simulation": "agent-stack-spiral v1.1.7",
         "question": args.question,
         "stopped_by": st["stopped"],
         "seconds": round(st["secs"], 1),
@@ -427,7 +427,7 @@ def main():
     TRACE.flush()
 
     print()
-    emit(f"{col.BOLD}  ⚡ AGENT STACK SPIRAL {col.DIM}v1.1.6 — descent into an agent that never comes back{col.END}")
+    emit(f"{col.BOLD}  ⚡ AGENT STACK SPIRAL {col.DIM}v1.1.7 — descent into an agent that never comes back{col.END}")
     emit(f"  question: {col.CYAN}\"{safe_text(args.question)}\"{col.END}")
 
     st = dict(secs=0.0, generated=0, ctx=0, flops=0.0, energy_wh=0.0, cost=0.0,

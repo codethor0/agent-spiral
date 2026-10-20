@@ -32,18 +32,37 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          # Exact title match only: the jq filter below closes/creates issues
+          # with this precise title, never a loosely-matching one.
+          HEALTH_TITLE: CI health check failing on main
         run: |
-          TITLE="CI health check failing on main"
-          if gh issue list --state open --search "$TITLE in:title" --json number --jq '.[0].number' | grep -q .; then
+          NUMBER=$(gh issue list --state open --search "$HEALTH_TITLE in:title" --limit 50 \
+            --json number,title \
+            --jq '[.[] | select(.title == "CI health check failing on main")][0].number')
+          if [ -n "$NUMBER" ] && [ "$NUMBER" != "null" ]; then
             echo "An open health-check issue already exists; not creating a duplicate."
-            gh issue list --state open --search "$TITLE in:title" --json number,title,url \
-              --jq '.[0] | "Existing: #\(.number) \(.title) — \(.url)"'
+            gh issue view "$NUMBER" --json number,title,url \
+              --jq '"Existing: #\(.number) \(.title) — \(.url)"'
           else
-            gh issue create --title "$TITLE" --body "The daily CI health check just failed on \`main\`.
+            gh issue create --title "$HEALTH_TITLE" --body "The daily CI health check just failed on \`main\`.
 
             Run: $RUN_URL
 
             Possible causes: runner-image changes, dependency drift, or a real regression that push-triggered CI missed (e.g. timing-sensitive tests).
 
-            Close this issue once the suite is green again; a new one will be opened if the failure recurs."
+            This issue closes automatically as soon as a daily health check passes again."
+          fi
+      - name: Close health-check issue on recovery
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          NUMBER=$(gh issue list --state open --search "CI health check failing on main in:title" --limit 50 \
+            --json number,title \
+            --jq '[.[] | select(.title == "CI health check failing on main")][0].number')
+          if [ -n "$NUMBER" ] && [ "$NUMBER" != "null" ]; then
+            gh issue close "$NUMBER" --comment "The daily CI health check is green again. Run: $RUN_URL"
+          else
+            echo "No open health-check issue; nothing to close."
           fi

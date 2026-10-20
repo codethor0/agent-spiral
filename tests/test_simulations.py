@@ -325,7 +325,7 @@ class TestKnownBugs(unittest.TestCase):
         """The v1.1.5 release still displayed v1.1.4 banners (security audit
         SEC-3). Every script must agree on one version string; bump both the
         banners and EXPECTED below with each release."""
-        EXPECTED = "v1.1.6"
+        EXPECTED = "v1.1.7"
         for script in ("the_spiral.py", "stuck_agent.py", "agent_stack_spiral.py",
                        "deeper_than_this.py", "deepest.py"):
             with self.subTest(script=script):
@@ -355,6 +355,106 @@ class TestKnownBugs(unittest.TestCase):
                         content = f.read()
                     self.assertIn("[TRACE INTERRUPTED", content)
                     self.assertNotIn("SUMMARY (JSON)", content)
+
+
+class TestTracePathGuards(unittest.TestCase):
+    """--trace must refuse symlinks and special files instead of overwriting
+    an unrelated target (security audit AS-05)."""
+
+    def test_trace_symlink_refused(self):
+        if not hasattr(os, "O_NOFOLLOW"):
+            self.skipTest("O_NOFOLLOW unavailable on this platform")
+        with tempfile.TemporaryDirectory() as td:
+            victim = os.path.join(td, "victim.txt")
+            with open(victim, "w", encoding="utf-8") as f:
+                f.write("precious")
+            link = os.path.join(td, "trace.log")
+            os.symlink(victim, link)
+            r = run_script("the_spiral.py",
+                           ["--fast", "--live", "0.2", "--seconds", "1",
+                            "--trace", link])
+            self.assertEqual(r.returncode, 1, r.stdout[-300:] + r.stderr[-300:])
+            self.assertIn("symbolic link", r.stdout + r.stderr)
+            with open(victim, encoding="utf-8") as f:
+                self.assertEqual(f.read(), "precious")
+
+    def test_trace_dangling_symlink_refused(self):
+        if not hasattr(os, "O_NOFOLLOW"):
+            self.skipTest("O_NOFOLLOW unavailable on this platform")
+        with tempfile.TemporaryDirectory() as td:
+            link = os.path.join(td, "dangling.log")
+            os.symlink(os.path.join(td, "does-not-exist"), link)
+            r = run_script("the_spiral.py",
+                           ["--fast", "--live", "0.2", "--seconds", "1",
+                            "--trace", link])
+            self.assertEqual(r.returncode, 1)
+            self.assertIn("symbolic link", r.stdout + r.stderr)
+
+    def test_trace_fifo_refused_without_hanging(self):
+        if not hasattr(os, "mkfifo"):
+            self.skipTest("mkfifo unavailable on this platform")
+        with tempfile.TemporaryDirectory() as td:
+            fifo = os.path.join(td, "t.fifo")
+            os.mkfifo(fifo)
+            r = run_script("the_spiral.py",
+                           ["--fast", "--live", "0.2", "--seconds", "1",
+                            "--trace", fifo], timeout=60)
+            self.assertEqual(r.returncode, 1, r.stdout[-300:] + r.stderr[-300:])
+            # both refusal paths surface one platform-independent message:
+            # macOS fails the O_NONBLOCK open with ENXIO, Linux opens the
+            # fifo and the fstat check refuses it — either way, no hang.
+            self.assertIn("not a regular file", r.stdout + r.stderr)
+            self.assertTrue(os.path.exists(fifo))  # fifo not replaced
+
+    def test_trace_directory_refused(self):
+        with tempfile.TemporaryDirectory() as td:
+            r = run_script("the_spiral.py",
+                           ["--fast", "--live", "0.2", "--seconds", "1",
+                            "--trace", td])
+            self.assertEqual(r.returncode, 1)
+
+    def test_trace_regular_file_still_works(self):
+        with tempfile.TemporaryDirectory() as td:
+            trace = os.path.join(td, "t.log")
+            r = run_script("the_spiral.py",
+                           ["--fast", "--live", "0.2", "--seconds", "1",
+                            "--trace", trace])
+            self.assertEqual(r.returncode, 0, r.stdout[-300:] + r.stderr[-300:])
+            self.assertGreater(os.path.getsize(trace), 100)
+
+
+class TestHealthCheckWorkflow(unittest.TestCase):
+    """The daily health-check workflow must dedupe issues on failure, close
+    the exact tracking issue on recovery, and never act on loosely-matching
+    issues (security audit AS-06)."""
+
+    def test_lifecycle_steps_and_exact_match_present(self):
+        wf = os.path.join(REPO_ROOT, ".github", "workflows", "health-check.yml")
+        with open(wf, encoding="utf-8") as f:
+            y = f.read()
+        self.assertIn("Open issue on failure", y)
+        self.assertIn("Close health-check issue on recovery", y)
+        self.assertIn("if: success()", y)
+        # narrow, deterministic matching: exact title only
+        self.assertEqual(y.count('select(.title == "CI health check failing on main")'), 2)
+        # least privilege retained
+        self.assertIn("contents: read", y)
+        self.assertIn("issues: write", y)
+        self.assertNotIn("actions: write", y)
+
+    def test_exact_title_filter_matches_only_the_tracking_issue(self):
+        issues = [
+            {"number": 5, "title": "CI health check failing on main"},
+            {"number": 7, "title": "CI health check failing on main (old)"},
+            {"number": 9, "title": "CI health check failing on main — nightly"},
+            {"number": 11, "title": "unrelated issue"},
+        ]
+        exact = [i["number"] for i in issues
+                 if i["title"] == "CI health check failing on main"]
+        self.assertEqual(exact, [5])
+        self.assertNotIn(7, exact)   # loosely-titled issues are never closed
+        self.assertNotIn(9, exact)
+        self.assertNotIn(11, exact)
 
 
 class TestSafeText(unittest.TestCase):
