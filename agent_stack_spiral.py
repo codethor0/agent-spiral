@@ -39,6 +39,7 @@ import re
 import shutil
 import sys
 import time
+import unicodedata
 from collections import Counter, deque
 from datetime import timedelta
 
@@ -66,9 +67,14 @@ TRACE = None  # trace file spooled incrementally; opened in main()
 
 
 def safe_text(s):
-    # neutralize control characters so question text can never emit terminal
-    # escapes or break trace layout; printable text (incl. unicode) is kept
-    return "".join(ch if 32 <= ord(ch) != 127 else f"\\x{ord(ch):02x}" for ch in s)
+    # Neutralize every Unicode control character — C0, C1, format chars
+    # (bidi overrides like U+202E, zero-width spaces), surrogates, private
+    # use — so question text can never emit terminal escapes, reorder or
+    # visually spoof displayed text, or break trace layout. Letters and
+    # punctuation from all real scripts (Arabic, Hebrew, CJK, …) are kept;
+    # only category-C code points are escaped.
+    return "".join(ch if not unicodedata.category(ch).startswith("C")
+                   else f"\\u{ord(ch):04x}" for ch in s)
 
 
 def emit(s=""):
@@ -343,7 +349,7 @@ def postmortem(args, st):
     emit(f"  {col.DIM}the spiral lives in the gap between 'no layer failed' and 'nobody stopped it'.{col.END}")
 
     summary = {
-        "simulation": "agent-stack-spiral v1.1.4",
+        "simulation": "agent-stack-spiral v1.1.6",
         "question": args.question,
         "stopped_by": st["stopped"],
         "seconds": round(st["secs"], 1),
@@ -421,7 +427,7 @@ def main():
     TRACE.flush()
 
     print()
-    emit(f"{col.BOLD}  ⚡ AGENT STACK SPIRAL {col.DIM}v1.1.4 — descent into an agent that never comes back{col.END}")
+    emit(f"{col.BOLD}  ⚡ AGENT STACK SPIRAL {col.DIM}v1.1.6 — descent into an agent that never comes back{col.END}")
     emit(f"  question: {col.CYAN}\"{safe_text(args.question)}\"{col.END}")
 
     st = dict(secs=0.0, generated=0, ctx=0, flops=0.0, energy_wh=0.0, cost=0.0,

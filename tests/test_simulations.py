@@ -18,6 +18,7 @@ Planck-zoom animation reaching the wall inside the live window).
 import json
 import os
 import py_compile
+import re
 import signal
 import subprocess
 import sys
@@ -319,6 +320,64 @@ class TestKnownBugs(unittest.TestCase):
             src = f.read()
         self.assertNotIn("the only control that worked", src)
         self.assertIn("4/4 in field sessions", src)
+
+    def test_all_scripts_agree_on_version(self):
+        """The v1.1.5 release still displayed v1.1.4 banners (security audit
+        SEC-3). Every script must agree on one version string; bump both the
+        banners and EXPECTED below with each release."""
+        EXPECTED = "v1.1.6"
+        for script in ("the_spiral.py", "stuck_agent.py", "agent_stack_spiral.py",
+                       "deeper_than_this.py", "deepest.py"):
+            with self.subTest(script=script):
+                with open(os.path.join(REPO_ROOT, script), encoding="utf-8") as f:
+                    src = f.read()
+                found = set(re.findall(r"v\d+\.\d+\.\d+", src))
+                self.assertEqual(found, {EXPECTED},
+                                 f"{script} banners {found} != {EXPECTED}")
+
+    def test_sigterm_marks_trace_interrupted(self):
+        """SIGTERM/SIGHUP must leave a truncation marker in the trace so a
+        partial handoff can never be mistaken for a complete run (SEC-4)."""
+        for sig, rc_expected in ((signal.SIGTERM, 143), (signal.SIGHUP, 129)):
+            with self.subTest(signal=sig):
+                with tempfile.TemporaryDirectory() as td:
+                    trace = os.path.join(td, "t.log")
+                    p = subprocess.Popen(
+                        [sys.executable, os.path.join(REPO_ROOT, "the_spiral.py"),
+                         "--fast", "--live", "0.5", "--trace", trace],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                    time.sleep(4)
+                    p.send_signal(sig)
+                    _, err = p.communicate(timeout=30)
+                    self.assertEqual(p.returncode, rc_expected,
+                                     f"child stderr: {err.decode(errors='replace')[-300:]}")
+                    with open(trace, encoding="utf-8", errors="replace") as f:
+                        content = f.read()
+                    self.assertIn("[TRACE INTERRUPTED", content)
+                    self.assertNotIn("SUMMARY (JSON)", content)
+
+
+class TestSafeText(unittest.TestCase):
+    """Unicode controls in the question must be neutralized (security audit
+    round 7): bidi overrides, zero-width format characters, and C1 controls
+    can spoof or reorder terminal output and poison trace layout, while
+    legitimate non-Latin text must pass through unchanged."""
+
+    def test_question_unicode_controls_neutralized(self):
+        arabic = "\u0645\u0631\u062d\u0628\u0627"  # مرحبا
+        with tempfile.TemporaryDirectory() as td:
+            r = run_script("the_spiral.py",
+                           ["-q", f"evil \u202e spoof \u200b \x9b end {arabic}",
+                            "--fast", "--live", "0.05", "--seconds", "1",
+                            "--trace", os.path.join(td, "t.log")],
+                           timeout=60)
+            self.assertEqual(r.returncode, 0, r.stderr[-300:])
+            self.assertIn("\\u202e", r.stdout)   # right-to-left override escaped
+            self.assertIn("\\u200b", r.stdout)   # zero-width space escaped
+            self.assertIn("\\u009b", r.stdout)   # C1 CSI escaped
+            self.assertNotIn("\u202e", r.stdout)  # no raw override survives
+            self.assertNotIn("\u200b", r.stdout)
+            self.assertIn(arabic, r.stdout)       # real script text kept
 
 
 if __name__ == "__main__":
