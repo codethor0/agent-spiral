@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.6 - 2026-10-19
 
 Security audit rounds 7–8 (branch security/audit-2026-10-18), Stage A
 read-only review plus surgical fixes; every fix has a regression test.
