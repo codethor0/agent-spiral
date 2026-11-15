@@ -60,7 +60,7 @@ Stdlib-only suite (no dependencies beyond Python itself):
 python3 -m unittest discover -s tests
 ```
 
-51 tests across three files cover compile sanity, bounded runs of all five
+77 tests across three files cover compile sanity, bounded runs of all five
 scripts, trace JSON validity, argument validation exit codes, broken-pipe
 and closed-stdout behavior, Ctrl+C reporting, independent recomputation of
 the hardware model constants, and terminal-renderer escape sequences. The

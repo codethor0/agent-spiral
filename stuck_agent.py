@@ -158,7 +158,7 @@ def run(args):
         try:
             # ---- boot sequence (Ctrl+C here still gets the post-mortem) ----
             print()
-            print(f"{col.BOLD}  🧠 stuck-agent simulation {col.DIM}v1.1.6{col.END}")
+            print(f"{col.BOLD}  🧠 stuck-agent simulation {col.DIM}v1.1.7{col.END}")
             print(f"  question: {col.CYAN}\"{q}\"{col.END}")
             print()
             for line in BOOT:
@@ -264,7 +264,7 @@ def postmortem(state, args, emit, trace):
 
     # ---- trace summary: commit despite a stray Ctrl+C during the write ----
     summary = {
-        "simulation": "stuck-agent v1.1.6",
+        "simulation": "stuck-agent v1.1.7",
         "question": args.question,
         "stopped_by": state["stopped"],
         "seconds": round(elapsed, 1),

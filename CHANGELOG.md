@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.1.7 - 2026-10-19
+
+Security audit round 9 ("zero-known-defect release gate", branch
+audit/round-9); every fix has a regression test. 77 tests, 0 skips.
+
+- tools/render_demo.py: every malformed event shape — JSON scalars
+  (null/true/numbers/strings), wrong-length arrays, objects, non-string
+  event codes — is a clean exit-1 diagnostic instead of an uncaught
+  TypeError from tuple unpacking or a silent skip (AS-01).
+- tools/render_demo.py: ANSI parser bounds — at most 19 digits per CSI
+  parameter, parameter strings over 256 chars consumed-but-ignored, and a
+  4096-byte cap on escape sequences pending across feed() chunks (AS-02).
+- tools/render_demo.py: documented timestamp domain enforced at parse —
+  finite, 0..1 year, non-decreasing; frame-delay arithmetic clamps to
+  0.02..600 s before int() (AS-03).
+- tools/render_demo.py: explicit resource budgets — 32 MiB input, 1 MiB
+  per event line, 500k events, 20k snapshots, 4M cell-frames (AS-04).
+- the_spiral.py: --trace refuses symlinks (O_NOFOLLOW), special files
+  (fstat on the opened fd), and cannot hang on a FIFO (O_NONBLOCK); a
+  symlink can no longer redirect the trace onto an unrelated file (AS-05).
+- .github/workflows/health-check.yml: a green daily run closes the exact
+  tracking issue; failure dedupe matches the exact title only (AS-06).
+- README/CONTRIBUTING/docs synced to the 77-test suite, the 3.11–3.13
+  matrix, and the round-9 audit record; banners and the re-recorded
+  demo.cast/demo.gif now say v1.1.7 (AS-07).
+
 ## 1.1.6 - 2026-10-19
 
 Security audit rounds 7–8 (branch security/audit-2026-10-18), Stage A

@@ -72,3 +72,36 @@ Existing coverage verified present and specific: termination-cause tests (timeou
 ## J–L. Stage B summary, recommendations, verification
 
 See the draft PR: branch `security/audit-2026-10-18`, fixes SEC-1..SEC-6 with regression tests; SEC-7 and tag protection are **owner decisions** (options in PR body). `main`, tags, and releases untouched; draft PR only.
+
+---
+
+# Round 9 — Zero-Known-Defect Release Gate (2026-10-19)
+
+Auditor: Kimi Work, per the "MASTER PROMPT: AGENT-SPIRAL ZERO-KNOWN-DEFECT RELEASE GATE"
+brief. Baseline: `main` @ **629799f** (release **v1.1.6** → tag `96f0d1c`, annotated).
+Branch: `audit/round-9`. Suite: **77 tests, 0 skips** (+16 over v1.1.6).
+
+## R9 findings and resolutions
+
+| ID | Severity | Component | Finding | Resolution |
+|---|---|---|---|---|
+| AS-01 | P3 | renderer input | JSON event scalars (`null`/`true`/`123`/`"str"`) raised an uncaught `TypeError` from tuple unpacking; non-string event codes were silently skipped; wrong-length arrays hit the message for the wrong layer | structure + field-type validation before unpacking; every malformed shape is a clean exit-1 diagnostic |
+| AS-02 | P3 | renderer parser | a CSI parameter with >4300 digits reached `int()` and died on Python's conversion limit; an unterminated CSI/OSC could grow `pending` without bound | parser policy: ≤19 digits per parameter (longer degrade to 0), parameter strings >256 chars consumed-but-ignored, `pending` capped at 4096 bytes (ESC+introducer retained so a capped sequence still completes as ignored) |
+| AS-03 | P3 | renderer time domain | finite-but-huge timestamps (`1e15`, `1e308`) passed validation but overflowed derived frame-delay arithmetic; negatives and reversed order were silently normalized | documented domain enforced at parse: finite, `0 ≤ t ≤ 1 year`, non-decreasing; `render()` clamps holds to 0.02–600 s before `int()` as defense in depth |
+| AS-04 | P3 | renderer resources | the 100k-cell cap alone did not bound the full allocation chain (file bytes, line bytes, event count, snapshot count, retained cells) | explicit budgets: 32 MiB input, 1 MiB/line, 500k events, 20k snapshots, 4M cell-frames (~280 MB worst case; the shipped demo is ~1.3M). Every over-budget cast exits 1 with a clear message |
+| AS-05 | P3 | path handling | `--trace` followed symlinks and could overwrite an unrelated target (previously SEC-7, documented only) | `open_trace()`: `O_NOFOLLOW` on the leaf + `fstat` on the opened fd (closes the TOCTOU race) + regular-file requirement; `O_NONBLOCK` so a FIFO open cannot hang the process. Symlink/dangling/fifo/dir refused with clean errors; regular-file behavior unchanged. Symlinked parents still followed (standard resolution) |
+| AS-06 | P3 | CI workflow | health-check opened a tracking issue on failure but never closed it on recovery; dedupe matched loosely (`in:title`) | exact-title jq filter on both paths; recovery step (`if: success()`) closes only the exact tracking issue; least-privilege permissions unchanged |
+| AS-07 | P3 | documentation | README said 51 tests (suite: 61→77); CONTRIBUTING wishlisted a 3.8–3.13 matrix (actual: 3.11–3.13); security report ended at round 8 | README count → 77 (final count taken from the completed suite); CONTRIBUTING matrix corrected; this section documents round 9 |
+
+## R9 verification
+
+- Every AS-01..AS-05 fix has a reproducer that failed pre-fix and passes post-fix (16 new tests; the round-7 huge-gap test was re-pointed at 1e7 s — inside the new domain, same clamp semantics — rather than weakened).
+- Adversarial spot checks (subprocess, no host risk): 5000-digit CSI → clean render; unterminated OSC ×9 KB → `pending` ≤ 4096 and clean recovery; `1e308`/negative/reversed timestamps → exit 1, no traceback; 100k-cell grid × 42 snapshots → "rendering workload" error; symlink/fifo/directory/dangling `--trace` → exit 1, victim file untouched, no hang.
+- jq exact-match filter verified against fixtures: only the precisely-titled issue matches; near-miss titles (`(old)`, `— nightly`, body mentions) never close; empty result on a healthy run closes nothing.
+- demo.cast re-recorded from the v1.1.7 code (`termtosvg`, same protocol) and docs/demo.gif re-rendered; first/last frames visually verified (banner v1.1.7, complete guard map, no ghosting).
+- Version sync: all five simulation scripts + renderer agree on **v1.1.7** (`test_all_scripts_agree_on_version`).
+
+## R9 residual items (owner decisions, unchanged from round 8)
+
+- Tag-protection ruleset for `v*` and read-only default workflow permission: recommended, not applied (repository Settings changes require owner action).
+- Cast files played in a real terminal execute their sequences (no player ships with the repo) — documented risk, not a defect.

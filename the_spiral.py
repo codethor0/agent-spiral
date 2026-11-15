@@ -29,6 +29,7 @@ Stdlib only. Numbers: simplified-but-real (H100-class, 8B fp16 model).
 """
 
 import argparse
+import errno
 import json
 import math
 import os
@@ -36,6 +37,7 @@ import random
 import re
 import shutil
 import signal
+import stat
 import sys
 import time
 import unicodedata
@@ -745,7 +747,7 @@ def final_report(args, st4, st12):
     emit()
 
     summary = {
-        "simulation": "the-spiral v1.1.6 — complete descent L0→L22",
+        "simulation": "the-spiral v1.1.7 — complete descent L0→L22",
         "question": args.question,
         "stopped_by": stopped_by,
         "ladder_levels": len(LADDER),
@@ -817,6 +819,44 @@ def positive_float(v):
     return x
 
 
+def open_trace(path):
+    """Open `path` for trace writing with symlink and special-file guards.
+
+    Policy (security audit AS-05): the final path component must not be a
+    symbolic link — O_NOFOLLOW means a dangling or redirected link can never
+    make --trace overwrite an unrelated target — and the opened descriptor
+    must be a regular file. Validating the fd with fstat AFTER the open (not
+    the path before it) closes the check-then-open race. Existing regular
+    files are truncated as before; directories, fifos, devices, and sockets
+    are refused. Symlinked parent directories are still followed (standard
+    path resolution: --trace /tmp/x is legitimate even when /tmp is a link).
+    """
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NONBLOCK
+    if hasattr(os, "O_NOFOLLOW"):  # POSIX; absent on Windows (documented)
+        flags |= os.O_NOFOLLOW
+    try:
+        fd = os.open(path, flags, 0o666)
+    except OSError as e:
+        # O_NONBLOCK write-open of a FIFO with no reader fails ENXIO
+        # (wording varies by platform); report it as the same special-file
+        # refusal the fstat check below produces for an opened fifo.
+        if e.errno == errno.ENXIO:
+            raise OSError(errno.EINVAL,
+                          f"trace path is not a regular file: {path}") from e
+        raise
+    try:
+        # O_NONBLOCK keeps a FIFO from blocking the open while we inspect
+        # it; anything that is not a regular file is refused below, and
+        # O_NONBLOCK is a no-op for regular files on POSIX.
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            raise OSError(errno.EINVAL,
+                          f"trace path is not a regular file: {path}")
+    except BaseException:
+        os.close(fd)
+        raise
+    return os.fdopen(fd, "w", encoding="utf-8", errors="backslashreplace")
+
+
 def main():
     p = argparse.ArgumentParser(description="The complete descent: L0 → L22. As deep as we can go.")
     p.add_argument("-q", "--question", default="why did production go down last night?")
@@ -862,9 +902,13 @@ def main():
 
     global TRACE
     try:
-        TRACE = open(args.trace, "w", encoding="utf-8", errors="backslashreplace")
+        TRACE = open_trace(args.trace)
     except OSError as e:
-        print(f"cannot open trace file {args.trace}: {e}")
+        if getattr(e, "errno", None) == errno.ELOOP:
+            print(f"cannot open trace file {args.trace}: refusing to follow "
+                  f"a symbolic link")
+        else:
+            print(f"cannot open trace file {args.trace}: {e}")
         sys.exit(1)
 
     TRACE.write("THE-SPIRAL COMPLETE TRACE\n" + "=" * 64 + "\n")
@@ -876,7 +920,7 @@ def main():
     signal.signal(signal.SIGHUP, _terminate)
 
     print()
-    emit(f"{col.BOLD}  🌀 THE SPIRAL {col.DIM}v1.1.6 — the complete descent · L0 → L22 · maximum depth{col.END}")
+    emit(f"{col.BOLD}  🌀 THE SPIRAL {col.DIM}v1.1.7 — the complete descent · L0 → L22 · maximum depth{col.END}")
     emit(f"  question: {col.CYAN}\"{safe_text(args.question)}\"{col.END}  "
          f"{col.DIM}(Ctrl+C any time → final report){col.END}")
 

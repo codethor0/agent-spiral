@@ -401,7 +401,7 @@ def descent_report(args, st):
     emit()
 
     summary = {
-        "simulation": "deeper-than-this v1.1.6",
+        "simulation": "deeper-than-this v1.1.7",
         "stopped_by": st["stopped"],
         "levels": ["orchestrator", "cuda_kernel", "tensor_core", "fp16_number",
                    "memory_hierarchy", "dram_cell", "transistor", "silicon_electrons", "bottom_fields"],
@@ -479,7 +479,7 @@ def main():
     args.speedup = 4.0 if args.fast else 1.0
 
     print()
-    emit(f"{col.BOLD}  🔻 DEEPER THAN THIS {col.DIM}v1.1.6 — stack_spiral ended at the GPU. that was the foyer.{col.END}")
+    emit(f"{col.BOLD}  🔻 DEEPER THAN THIS {col.DIM}v1.1.7 — stack_spiral ended at the GPU. that was the foyer.{col.END}")
     emit(f"  {col.DIM}same question riding all the way down: \"why did production go down?\"{col.END}")
 
     st = dict(cycles=0, secs=0.0, stopped="operator interrupt (Ctrl+C)")

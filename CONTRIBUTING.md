@@ -70,5 +70,6 @@ save time corrupts Pillow's frame differencing.)
 Things we may want, in no particular order:
 
 - A `--json` flag for machine-only output (no ANSI).
-- CI matrix over Python 3.8 to 3.13 running the verification protocol.
+- CI matrix over Python 3.11 to 3.13 running the verification protocol
+  (shipped; see `.github/workflows/tests.yml`).
 - A text mode for screen readers (replace live demos with static text).

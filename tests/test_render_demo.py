@@ -142,6 +142,33 @@ class TestTerm(unittest.TestCase):
         self.assertEqual(row_text(t).rstrip(), "AG")
         self.assertEqual(t.grid[0][1][1], render_demo.BASE[32])
 
+    def test_oversized_csi_param_no_crash(self):
+        # security audit AS-02: a CSI parameter with thousands of digits used
+        # to reach int() and trip Python's integer-conversion limit with an
+        # uncaught ValueError. Over-long parameters now degrade to 0.
+        t = self.make()
+        t.feed("\x1b[" + "9" * 5000 + "mX")
+        self.assertEqual(row_text(t).rstrip(), "X")
+        self.assertEqual(t.grid[0][0][1], render_demo.DEFAULT_FG)
+
+    def test_oversized_csi_raw_ignored(self):
+        # security audit AS-02: a parameter string over MAX_CSI_RAW chars is
+        # consumed but the whole sequence is ignored (parser policy), even
+        # when it contains valid-looking parameters.
+        t = self.make()
+        t.feed("\x1b[" + "31;" * 100 + "0mX")
+        self.assertEqual(row_text(t).rstrip(), "X")
+        self.assertEqual(t.grid[0][0][1], render_demo.DEFAULT_FG)
+
+    def test_pending_escape_capped(self):
+        # security audit AS-02: an unterminated escape sequence held in
+        # `pending` must never grow without bound across feed() calls.
+        t = self.make()
+        t.feed("A\x1b[" + "9" * 9000)
+        self.assertLessEqual(len(t.pending), render_demo.MAX_PENDING)
+        t.feed("mZ")  # parser recovers; nothing renders from the garbage
+        self.assertEqual(row_text(t).rstrip(), "AZ")
+
 
 @unittest.skipUnless(HAS_PIL, "Pillow not installed; render_demo tests skipped")
 class TestRenderPipeline(unittest.TestCase):
@@ -274,12 +301,14 @@ class TestRenderPipeline(unittest.TestCase):
 
     def test_huge_final_gap_still_renders(self):
         # security audit round 7: pathological (but finite) gaps must clamp
-        # to the GIF 16-bit delay range, not crash int()/Pillow.
+        # to the GIF 16-bit delay range, not crash int()/Pillow. Round 9
+        # (AS-03) narrowed the timestamp domain to one year, so the gap is
+        # now 1e7 s (~115 days): still absurd, still clamps, but in-domain.
         with tempfile.TemporaryDirectory() as td:
             cast = os.path.join(td, "gap.cast")
             with open(cast, "w", encoding="utf-8") as f:
                 f.write('{"version": 2, "width": 40, "height": 10}\n')
-                f.write('[0.0, "o", "first"]\n[1e15, "o", "last"]\n')
+                f.write('[0.0, "o", "first"]\n[1e7, "o", "last"]\n')
             out = os.path.join(td, "o.gif")
             p = subprocess.run(
                 [sys.executable, os.path.join(REPO_ROOT, "tools", "render_demo.py"),
@@ -287,6 +316,126 @@ class TestRenderPipeline(unittest.TestCase):
                 capture_output=True, text=True)
             self.assertEqual(p.returncode, 0, p.stderr)
             self.assertTrue(os.path.getsize(out) > 0)
+
+    def test_malformed_event_structures_rejected(self):
+        # security audit AS-01: JSON scalars and wrongly-shaped events used
+        # to crash with an uncaught TypeError from tuple unpacking; every
+        # malformed structure must be a clean error.
+        lines = ["null", "true", "false", "123", '"str"', "[]", "[1]", "[1, 2]",
+                 "[1, 2, 3, 4]", '{"a": 1}', "[0.1, 5, \"x\"]", "[true, \"o\", \"x\"]"]
+        for line in lines:
+            with self.subTest(line=line):
+                with tempfile.TemporaryDirectory() as td:
+                    bad = os.path.join(td, "bad.cast")
+                    with open(bad, "w", encoding="utf-8") as f:
+                        f.write('{"version": 2, "width": 40, "height": 10}\n')
+                        f.write(line + "\n")
+                    p = subprocess.run(
+                        [sys.executable, os.path.join(REPO_ROOT, "tools", "render_demo.py"),
+                         bad, os.path.join(td, "o.gif")],
+                        capture_output=True, text=True)
+                    self.assertEqual(p.returncode, 1, p.stderr)
+                    self.assertIn("malformed", p.stderr)
+                    self.assertNotIn("Traceback", p.stderr)
+
+    def test_timestamp_domain_and_ordering_enforced(self):
+        # security audit AS-03: finite-but-huge timestamps (1e15, 1e308)
+        # overflow derived frame-delay arithmetic; negatives and reversed
+        # order violate the documented domain. All must be clean errors.
+        casts = [
+            ('[1e15, "o", "x"]', "out of range"),
+            ('[1e308, "o", "x"]', "out of range"),
+            ('[-0.1, "o", "x"]', "out of range"),
+            ('[0.5, "o", "a"]\n[0.4, "o", "b"]', "out of order"),
+            ('[0.5, "i", "a"]\n[0.4, "o", "b"]', "out of order"),
+        ]
+        for events, msg in casts:
+            with self.subTest(events=events):
+                with tempfile.TemporaryDirectory() as td:
+                    bad = os.path.join(td, "bad.cast")
+                    with open(bad, "w", encoding="utf-8") as f:
+                        f.write('{"version": 2, "width": 40, "height": 10}\n')
+                        f.write(events + "\n")
+                    p = subprocess.run(
+                        [sys.executable, os.path.join(REPO_ROOT, "tools", "render_demo.py"),
+                         bad, os.path.join(td, "o.gif")],
+                        capture_output=True, text=True)
+                    self.assertEqual(p.returncode, 1, p.stderr)
+                    self.assertIn(msg, p.stderr)
+                    self.assertNotIn("Traceback", p.stderr)
+
+    def test_event_count_budget_enforced(self):
+        # security audit AS-04: event count is bounded; the renderer must
+        # stop with a clean error instead of parsing forever.
+        with tempfile.TemporaryDirectory() as td:
+            bad = os.path.join(td, "big.cast")
+            with open(bad, "w", encoding="utf-8") as f:
+                f.write('{"version": 2, "width": 40, "height": 10}\n')
+                f.write('[0.1, "o", "x"]\n' * (render_demo.MAX_EVENTS + 1))
+            p = subprocess.run(
+                [sys.executable, os.path.join(REPO_ROOT, "tools", "render_demo.py"),
+                 bad, os.path.join(td, "o.gif")],
+                capture_output=True, text=True, timeout=120)
+            self.assertEqual(p.returncode, 1, p.stderr)
+            self.assertIn("event budget", p.stderr)
+            self.assertNotIn("Traceback", p.stderr)
+
+    def test_oversized_event_line_budget_enforced(self):
+        # security audit AS-04: a single multi-megabyte event line (an
+        # escape-sequence bomb) must be rejected before parsing.
+        with tempfile.TemporaryDirectory() as td:
+            bad = os.path.join(td, "big.cast")
+            with open(bad, "w", encoding="utf-8") as f:
+                f.write('{"version": 2, "width": 40, "height": 10}\n')
+                f.write(json.dumps([0.1, "o", "x" * (render_demo.MAX_LINE_BYTES + 16)]) + "\n")
+            p = subprocess.run(
+                [sys.executable, os.path.join(REPO_ROOT, "tools", "render_demo.py"),
+                 bad, os.path.join(td, "o.gif")],
+                capture_output=True, text=True, timeout=60)
+            self.assertEqual(p.returncode, 1, p.stderr)
+            self.assertIn("event budget", p.stderr)
+            self.assertNotIn("Traceback", p.stderr)
+
+    def test_cell_frame_workload_budget_enforced(self):
+        # security audit AS-04: retained snapshots are full grid copies, so
+        # cells x snapshots is the memory amplifier. 42 snapshots of a
+        # 100,000-cell grid is 4.2M cell-frames, over the 4M budget.
+        with tempfile.TemporaryDirectory() as td:
+            bad = os.path.join(td, "big.cast")
+            with open(bad, "w", encoding="utf-8") as f:
+                f.write('{"version": 2, "width": 400, "height": 250}\n')
+                for i in range(42):
+                    f.write(f'[{i * 0.125}, "o", "x"]\n')
+            p = subprocess.run(
+                [sys.executable, os.path.join(REPO_ROOT, "tools", "render_demo.py"),
+                 bad, os.path.join(td, "o.gif")],
+                capture_output=True, text=True, timeout=60)
+            self.assertEqual(p.returncode, 1, p.stderr)
+            self.assertIn("rendering workload", p.stderr)
+            self.assertNotIn("Traceback", p.stderr)
+
+    def test_input_bytes_budget_enforced(self):
+        # security audit AS-04: the whole-file budget is checked before any
+        # parsing. Patched to a tiny bound so the test stays fast.
+        with tempfile.TemporaryDirectory() as td:
+            cast = os.path.join(td, "t.cast")
+            with open(cast, "w", encoding="utf-8") as f:
+                f.write('{"version": 2, "width": 40, "height": 10}\n')
+                f.write('[0.1, "o", "x"]\n')
+            old = render_demo.MAX_INPUT_BYTES
+            render_demo.MAX_INPUT_BYTES = 8
+            try:
+                argv = sys.argv
+                sys.argv = ["render_demo.py", cast, os.path.join(td, "o.gif")]
+                try:
+                    with self.assertRaises(SystemExit) as cm:
+                        render_demo.main()
+                finally:
+                    sys.argv = argv
+            finally:
+                render_demo.MAX_INPUT_BYTES = old
+            self.assertNotEqual(cm.exception.code, 0)
+            self.assertIn("too large", str(cm.exception.code))
 
 
 if __name__ == "__main__":
