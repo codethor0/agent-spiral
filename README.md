@@ -122,3 +122,7 @@ traces/sample-trace.log   example trace output
 ## License
 
 MIT. See LICENSE.
+
+## Support
+
+If this project is useful to you, you can support its continued development through [GitHub Sponsors](https://github.com/sponsors/codethor0).
